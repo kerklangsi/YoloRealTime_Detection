@@ -3,7 +3,7 @@
 #   ./build.ps1
 
 $pythonFiles   = Get-ChildItem -Filter *.py | Select-Object -First 1
-$iconFiles     = Get-ChildItem -Path .\icons -Filter *.ico | Select-Object -First 1
+$iconFiles     = Get-ChildItem -Filter *.ico | Select-Object -First 1
 $requirements  = "requirements.txt"
 
 if (-not $pythonFiles) {
@@ -31,7 +31,7 @@ $hiddenImportArgs = ($hiddenImports | ForEach-Object { "--hidden-import $_" }) -
 $pyinstallerArgs = @()
 $pyinstallerArgs += "--name"; $pyinstallerArgs += $name
 $pyinstallerArgs += "--onedir"
-$pyinstallerArgs += "--contents-directory=dist\$name"
+$pyinstallerArgs += "--contents-directory"; $pyinstallerArgs += "dist\$name"
 $pyinstallerArgs += "--noconsole"
 $pyinstallerArgs += "--icon=$icon"
 
