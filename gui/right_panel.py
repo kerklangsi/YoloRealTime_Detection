@@ -1,0 +1,32 @@
+import tkinter as tk
+from tkinter import ttk
+
+def setup_right_panel(self, parent):
+    right_frame = ttk.LabelFrame(parent, text="Detection Results")
+    right_frame.pack(side=tk.RIGHT, fill=tk.Y)
+    stats_frame = ttk.LabelFrame(right_frame, text="Session Statistics", padding=5)
+    stats_frame.pack(fill=tk.X, pady=(0, 10))
+    self.model_label = ttk.Label(stats_frame, text="Model: None")
+    self.model_label.pack(anchor=tk.W)
+    self.gpu_status_label = ttk.Label(stats_frame, text="Device: Unknown")
+    self.gpu_status_label.pack(anchor=tk.W)
+    self.session_time_label = ttk.Label(stats_frame, text="Session Time: 00:00:00")
+    self.session_time_label.pack(anchor=tk.W)
+    self.total_detections_label = ttk.Label(stats_frame, text="Total Detections: 0")
+    self.total_detections_label.pack(anchor=tk.W)
+    export_frame = ttk.Frame(stats_frame)
+    export_frame.pack(fill=tk.X, pady=5)
+    ttk.Button(export_frame, text="Save Stats", command=self.save_statistics).pack(side=tk.LEFT, padx=(0, 5))
+    ttk.Button(export_frame, text="Clear Stats", command=self.reset_statistics).pack(side=tk.LEFT)
+    ttk.Label(right_frame, text="Object Classes:", font=('Arial', 10, 'bold')).pack(anchor=tk.W, pady=(0, 5))
+    list_frame = ttk.Frame(right_frame)
+    list_frame.pack(fill=tk.BOTH, expand=True)
+    columns = ('Class', 'Current', 'Total', 'Confidence')
+    self.detection_tree = ttk.Treeview(list_frame, columns=columns, show='headings', height=15)
+    for col in columns:
+        self.detection_tree.heading(col, text=col)
+        self.detection_tree.column(col, width=80)
+    tree_scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.detection_tree.yview)
+    self.detection_tree.configure(yscrollcommand=tree_scrollbar.set)
+    self.detection_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    tree_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
