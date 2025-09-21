@@ -406,6 +406,11 @@ class YOLOGui:
                 if not self.cap.isOpened():
                     messagebox.showerror("Error", f"Could not open video source: {selected}")
                     return
+                # Display first frame immediately
+                ret, frame = self.cap.read()
+                if ret and frame is not None:
+                    self.display_frame(frame)
+                    self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 self.is_running = True
                 self.start_button.config(state=tk.DISABLED)
                 self.stop_button.config(state=tk.NORMAL)
@@ -424,6 +429,11 @@ class YOLOGui:
                 if not self.cap.isOpened():
                     messagebox.showerror("Error", "Could not open video source")
                     return
+                # Display first frame immediately
+                ret, frame = self.cap.read()
+                if ret and frame is not None:
+                    self.display_frame(frame)
+                    self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 self.is_running = True
                 self.start_button.config(state=tk.DISABLED)
                 self.stop_button.config(state=tk.NORMAL)
