@@ -30,7 +30,8 @@ class YOLODetector:
     
     def scan_available_model(self) -> List[str]:
         model_files = []
-        for model_dir in [Path("./model"), Path("./models")]:
+        # Use absolute path for reliability
+        for model_dir in [Path(__file__).parent / "model", Path(__file__).parent / "models"]:
             if model_dir.exists():
                 for pt_file in model_dir.glob("*.pt"):
                     model_files.append(pt_file.name)
@@ -434,11 +435,16 @@ class YOLOGui:
             elif source_type == "video":
                 if not self.current_source:
                     messagebox.showerror("Error", "Please select a video file")
-                return
+                    return
                 self.cap = cv2.VideoCapture(self.current_source)
                 if not self.cap.isOpened():
                     messagebox.showerror("Error", "Could not open video source")
-                return
+                    return
+                # Display first frame immediately to reduce perceived delay
+                ret, frame = self.cap.read()
+                if ret and frame is not None:
+                    self.display_frame(frame)
+                    self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # Reset to first frame for processing
                 self.is_running = True
                 self.start_button.config(state=tk.DISABLED)
                 self.stop_button.config(state=tk.NORMAL)
@@ -450,7 +456,7 @@ class YOLOGui:
             elif source_type == "image":
                 if not self.current_source:
                     messagebox.showerror("Error", "Please select an image file")
-                return
+                    return
                 frame = cv2.imread(self.current_source)
                 if frame is None:
                     messagebox.showerror("Error", f"Could not load image: {self.current_source}")
@@ -590,8 +596,8 @@ class YOLOGui:
         if selection:
             model_name = self.model_listbox.get(selection[0])
             self.selected_model.set(model_name)
-            # Try both ./model and ./models
-            for model_dir in [Path("./model"), Path("./models")]:
+            # Use absolute path for both model and models
+            for model_dir in [Path(__file__).parent / "model", Path(__file__).parent / "models"]:
                 candidate_path = model_dir / model_name
                 if candidate_path.exists():
                     if self.detector.load_model(str(candidate_path)):
@@ -641,6 +647,7 @@ class YOLOGui:
         self.current_source = None
         self.selected_file_label.config(text="No file selected")
         self.on_source_change()
+        self.refresh_model()
         self.source_display_label.config(text="Source: None")
         self.source_path_label.config(text="Source Path: None")
         self.video_label.config(image='', text="Video output will appear here", bg="#000000", fg="white")
