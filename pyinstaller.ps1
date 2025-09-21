@@ -15,37 +15,43 @@ if (-not $iconFiles) {
     Write-Host "ERROR: No icon (.ico) file found in icons\ folder." -ForegroundColor Red
     exit 1
 }
-if (!(Test-Path $include)) {
-    Write-Host "ERROR: $include not found. Please place it in the current folder." -ForegroundColor Red
-    exit 1
-}
-# Check for exclude.txt
-if (!(Test-Path $exclude)) {
-    Write-Host "WARNING: $exclude not found. No modules will be excluded." -ForegroundColor Yellow
-}
 
 $script = $pythonFiles.Name
 $name   = [System.IO.Path]::GetFileNameWithoutExtension($script)
 $icon   = $iconFiles.FullName
 
 # Read hidden imports from include.txt
-$hiddenImports = Get-Content $include | Where-Object { $_ -and $_ -notmatch "^#" }
+if (Test-Path $include) {
+    $hiddenImports = Get-Content $include | Where-Object { $_ -and $_ -notmatch "^#" }
+} else {
+    $hiddenImports = @()
+    Write-Host "ERROR: $include not found. Please place it in the current folder." -ForegroundColor Red
+}
 $hiddenImportArgs = ($hiddenImports | ForEach-Object { "--hidden-import $_" }) -join " "
 
 # Read excluded modules from exclude.txt
-$excludedModules = Get-Content $exclude | Where-Object { $_ -and $_ -notmatch "^#" }
+if (Test-Path $exclude) {
+    $excludedModules = Get-Content $exclude | Where-Object { $_ -and $_ -notmatch "^#" }
+} else {
+    $excludedModules = @()
+    Write-Host "WARNING: $exclude not found. No modules will be excluded." -ForegroundColor Yellow
+}
+$excludedModulesArgs = ($excludedModules | ForEach-Object { "--exclude-module $_" }) -join " "
 
 # Build argument array for PyInstaller
 $pyinstallerArgs = @()
-$pyinstallerArgs += "--name"; $pyinstallerArgs += $name
+$pyinstallerArgs += "--name"
+$pyinstallerArgs += $name
 $pyinstallerArgs += "--onedir"
 $pyinstallerArgs += "--noconsole"
 $pyinstallerArgs += "--icon=$icon"
+$pyinstallerArgs += "--contents-directory"
+$pyinstallerArgs += '"' + "." + '"'
 
 # Add excluded modules
 if ($excludedModules.Count -gt 0) {
     foreach ($module in $excludedModules) {
-        $pyinstallerArgs += "--exclude-module"; $pyinstallerArgs += $module
+    $pyinstallerArgs += "--exclude-module"; $pyinstallerArgs += '"' + $module + '"'
     }
 }
 
@@ -53,13 +59,20 @@ if ($excludedModules.Count -gt 0) {
 $folders = Get-ChildItem -Directory | Where-Object { $_.Name -ne '.git' -and $_.Name -ne '__pycache__' }
 foreach ($folder in $folders) {
     $pyinstallerArgs += "--add-data"
-    $pyinstallerArgs += "$($folder.Name);$($folder.Name)"
+    $pyinstallerArgs += '"' + "$($folder.Name);$($folder.Name)" + '"'
 }
 
 # Add hidden imports
 if ($hiddenImports.Count -gt 0) {
     foreach ($import in $hiddenImports) {
-        $pyinstallerArgs += "--hidden-import"; $pyinstallerArgs += $import
+    $pyinstallerArgs += "--hidden-import"; $pyinstallerArgs += '"' + $import + '"'
+    }
+}
+
+# Add excluded module
+if ($excludedModules.Count -gt 0) {
+    foreach ($module in $excludedModules) {
+        $pyinstallerArgs += "--exclude-module"; $pyinstallerArgs += $module
     }
 }
 $pyinstallerArgs += $script
