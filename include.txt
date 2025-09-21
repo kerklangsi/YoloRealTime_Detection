@@ -1,0 +1,6 @@
+ultralytics
+torch
+cv2
+numpy
+PIL
+pygrabber.dshow_graph

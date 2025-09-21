@@ -1,0 +1,14 @@
+notebook
+ipykernel
+jupyter
+MySQLdb
+psycopg2
+mkl_blacs_intelmpi_lp64
+mkl_blacs_intelmpi_ilp64
+mkl_blacs_msmpi_lp64
+mkl_blacs_msmpi_ilp64
+mkl_pgi_thread
+omptarget.sycl.wrap
+sycl6.dll
+charset_normalizer.md__mypyc
+importlib_resources.trees

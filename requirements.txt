@@ -1,6 +1,0 @@
-ultralytics
-torch
-opencv-python
-numpy
-Pillow
-pygrabber

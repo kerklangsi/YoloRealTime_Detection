@@ -4,7 +4,8 @@
 
 $pythonFiles   = Get-ChildItem -Filter *.py | Select-Object -First 1
 $iconFiles     = Get-ChildItem -Filter *.ico | Select-Object -First 1
-$requirements  = "requirements.txt"
+$include  = "include.txt"
+$exclude  = "exclude.txt"
 
 if (-not $pythonFiles) {
     Write-Host "ERROR: YoloRealTime_Detection.py not found in the current folder." -ForegroundColor Red
@@ -14,26 +15,39 @@ if (-not $iconFiles) {
     Write-Host "ERROR: No icon (.ico) file found in icons\ folder." -ForegroundColor Red
     exit 1
 }
-if (!(Test-Path $requirements)) {
-    Write-Host "ERROR: $requirements not found. Please place it in the current folder." -ForegroundColor Red
+if (!(Test-Path $include)) {
+    Write-Host "ERROR: $include not found. Please place it in the current folder." -ForegroundColor Red
     exit 1
+}
+# Check for exclude.txt
+if (!(Test-Path $exclude)) {
+    Write-Host "WARNING: $exclude not found. No modules will be excluded." -ForegroundColor Yellow
 }
 
 $script = $pythonFiles.Name
 $name   = [System.IO.Path]::GetFileNameWithoutExtension($script)
 $icon   = $iconFiles.FullName
 
-# Read hidden imports from requirements.txt
-$hiddenImports = Get-Content $requirements | Where-Object { $_ -and $_ -notmatch "^#" }
+# Read hidden imports from include.txt
+$hiddenImports = Get-Content $include | Where-Object { $_ -and $_ -notmatch "^#" }
 $hiddenImportArgs = ($hiddenImports | ForEach-Object { "--hidden-import $_" }) -join " "
+
+# Read excluded modules from exclude.txt
+$excludedModules = Get-Content $exclude | Where-Object { $_ -and $_ -notmatch "^#" }
 
 # Build argument array for PyInstaller
 $pyinstallerArgs = @()
 $pyinstallerArgs += "--name"; $pyinstallerArgs += $name
 $pyinstallerArgs += "--onedir"
-$pyinstallerArgs += "--contents-directory"; $pyinstallerArgs += "dist\$name"
 $pyinstallerArgs += "--noconsole"
 $pyinstallerArgs += "--icon=$icon"
+
+# Add excluded modules
+if ($excludedModules.Count -gt 0) {
+    foreach ($module in $excludedModules) {
+        $pyinstallerArgs += "--exclude-module"; $pyinstallerArgs += $module
+    }
+}
 
 # Automatically include all folders in the current directory (excluding files and hidden/system folders)
 $folders = Get-ChildItem -Directory | Where-Object { $_.Name -ne '.git' -and $_.Name -ne '__pycache__' }
