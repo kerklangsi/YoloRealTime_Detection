@@ -1,57 +1,40 @@
-import os
-import cv2
-import time
-import threading
-import sys
-import json
-import numpy as np
+
+import os,cv2,time,threading,sys,json,numpy as np
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict,List,Optional,Tuple
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
-from PIL import Image, ImageTk
+from tkinter import ttk,filedialog,messagebox
+from PIL import Image,ImageTk
 from ultralytics import YOLO
 try:
     from pygrabber.dshow_graph import FilterGraph
 except ImportError:
-    FilterGraph = None
+    FilterGraph=None
 
+# YOLODetector handles model loading, object detection, and statistics tracking
 class YOLODetector:
     def __init__(self):
-        self.model = None
-        self.model_path = None
-        self.class_names = []
-        self.detection_stats = {}
-        self.session_start_time = None
-        self.total_detections = 0
-        self.is_running = False
+        self.model, self.model_path, self.class_names = None, None, []
+        self.detection_stats, self.session_start_time = {}, None
+        self.total_detections, self.is_running = 0, False
         self.device_str = "Unknown"
-    
-    def scan_available_model(self) -> List[str]:
-        model_files = []
-        # Use absolute path for reliability
-        for model_dir in [Path(__file__).parent / "model", Path(__file__).parent / "models"]:
-            if model_dir.exists():
-                for pt_file in model_dir.glob("*.pt"):
-                    model_files.append(pt_file.name)
+
+    def scan_available_models(self) -> List[str]:
+        # Scan for available YOLO model files in the current directory
+        model_files, current_dir = [], Path(".")
+        for pt_file in current_dir.glob("*.pt"):
+            model_files.append(str(pt_file))
         return sorted(model_files)
     
     def load_model(self, model_path: str) -> bool:
-        candidate_paths = [Path(model_path)]
-        if not Path(model_path).is_absolute():
-            candidate_paths.append(Path("./model") / model_path)
-        full_path = None
-        for path in candidate_paths:
-            if path.exists() and str(path).endswith(".pt"):
-                full_path = path
-                break
-        if full_path is None:
+        # Load a YOLO model from the given path
+        if not os.path.exists(model_path) or not model_path.endswith(".pt"):
             print(f"Invalid model: {model_path}")
             return False
         try:
-            self.model = YOLO(str(full_path))
-            self.model_path = str(full_path)
+            self.model = YOLO(model_path)
+            self.model_path = model_path
             import torch
             if torch.cuda.is_available():
                 self.model.to("cuda")
@@ -66,9 +49,10 @@ class YOLODetector:
             print(f"Error loading model: {e}")
             return False
     
-    def detect_objects(self, frame: np.ndarray, conf_threshold: float = 0.5, nms_threshold: float = 0.4) -> Tuple[np.ndarray, List[Dict]]:
-        if self.model is None:
-            return frame, []
+    def detect_objects(self, frame: np.ndarray, conf_threshold: float = 0.5,
+                       nms_threshold: float = 0.4) -> Tuple[np.ndarray, List[Dict]]:
+        # Run object detection on a frame and return annotated frame and detections
+        if self.model is None: return frame, [] 
         try:
             results = self.model(frame, conf=conf_threshold, iou=nms_threshold)
             annotated_frame, detections = self._process_results(frame, results[0])
@@ -76,10 +60,10 @@ class YOLODetector:
         except Exception as e:
             print(f"Error during detection: {e}")
             return frame, []
-    
+
     def _process_results(self, frame: np.ndarray, result) -> Tuple[np.ndarray, List[Dict]]:
-        detections = []
-        annotated_frame = frame.copy()
+        # Process YOLO results and annotate the frame
+        detections, annotated_frame = [], frame.copy()
         if result.boxes is not None:
             boxes = result.boxes.xyxy.cpu().numpy()
             confidences = result.boxes.conf.cpu().numpy()
@@ -94,16 +78,18 @@ class YOLODetector:
                 cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 label = f"{class_name}: {conf:.2f}"
                 label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
-                cv2.rectangle(annotated_frame, (x1, y1 - label_size[1] - 10), (x1 + label_size[0], y1), (0, 255, 0), -1)
+                cv2.rectangle(annotated_frame, (x1, y1 - label_size[1] - 10),
+                              (x1 + label_size[0], y1), (0, 255, 0), -1)
                 cv2.putText(annotated_frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
-                detections.append({'class': class_name, 'confidence': float(conf), 'bbox': [int(x1), int(y1), int(x2), int(y2)]})
+                detections.append({'class': class_name,'confidence': float(conf),
+                                   'bbox': [int(x1), int(y1), int(x2), int(y2)]})
         return annotated_frame, detections
     
     def _update_detection_stats(self, class_name: str, confidence: float):
+        # Update detection statistics for each class
         if class_name not in self.detection_stats:
-            self.detection_stats[class_name] = {
-                'total_count': 0, 'current_count': 0, 'avg_confidence': 0.0, 'confidence_sum': 0.0
-            }
+            self.detection_stats[class_name] = {'total_count': 0,'current_count': 0,
+                                                'avg_confidence': 0.0,'confidence_sum': 0.0}
         stats = self.detection_stats[class_name]
         stats['total_count'] += 1
         stats['current_count'] += 1
@@ -112,66 +98,56 @@ class YOLODetector:
         self.total_detections += 1
     
     def get_current_detections(self) -> List[Dict]:
+        # Get current detection stats for display
         detections = []
         for class_name, stats in self.detection_stats.items():
             if stats['current_count'] > 0:
-                detections.append({
-                    'class': class_name, 'confidence': stats['avg_confidence'],
-                    'count': stats['current_count'], 'totalEncountered': stats['total_count']
-                })
+                detections.append({'class': class_name, 'confidence': stats['avg_confidence'],
+                                   'count': stats['current_count'], 'totalEncountered': stats['total_count']})
         return detections
     
     def reset_current_counts(self):
-        for stats in self.detection_stats.values():
-            stats.update({'current_count': 0})
-
+        # Reset current detection counts for a new frame
+        [stats.update({'current_count': 0}) for stats in self.detection_stats.values()]
     def reset_source(self):
+        # Reset statistics and session timer
         self.detection_stats = {}
         self.total_detections = 0
         self.session_start_time = datetime.now()
     
     def get_session_stats(self) -> Dict:
-        if self.session_start_time is None:
-            self.session_start_time = datetime.now()
+        # Get overall session statistics
+        if self.session_start_time is None: self.session_start_time = datetime.now()
         session_time = datetime.now() - self.session_start_time
-        return {
-            'modelName': os.path.basename(self.model_path) if self.model_path else 'No model',
-            'totalDetections': self.total_detections, 'sessionTime': str(session_time).split('.')[0],
-            'classStats': {name: stats['total_count'] for name, stats in self.detection_stats.items()}
-        }
+        return {'modelName': os.path.basename(self.model_path) if self.model_path else 'No model',
+                 'totalDetections': self.total_detections, 'sessionTime': str(session_time).split('.')[0],
+                 'classStats': {name: stats['total_count'] for name, stats in self.detection_stats.items()}}
     
     def save_statistics(self, filename: Optional[str] = None) -> str:
+        # Save statistics to a JSON file
         if filename is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"yolo_stats_{timestamp}.json"
         stats_data = {
             'session_info': self.get_session_stats(), 'detailed_stats': self.detection_stats,
             'export_time': datetime.now().isoformat()
-        }
+            }
         with open(filename, 'w') as f:
             json.dump(stats_data, f, indent=2)
             print(f"Statistics saved to: {filename}")
-            return filename
+        return filename
 
 class YOLOGui:
     def __init__(self):
+        # Initialize main window and variables
         self.root = tk.Tk()
         self.root.title("YOLO Object Detection GUI")
         self.root.geometry("1480x630")
         self.root.minsize(1480, 630)
         self.root.configure(bg="#ffffff")
-        # Set window icon
-        icon_path = os.path.join(os.path.dirname(__file__), "icon.ico")
-        if os.path.exists(icon_path):
-            try:
-                self.root.iconbitmap(icon_path)
-            except Exception as e:
-                print(f"Could not set icon: {e}")
         self.detector = YOLODetector()
-        self.cap = None
-        self.is_running = False
-        self.current_source = None
-        self.processing_thread = None
+        self.cap, self.is_running = None, False
+        self.current_source, self.processing_thread = None, None
         self.selected_source = tk.StringVar(value="media_device")
         self.selected_model = tk.StringVar()
         self.custom_model_path = tk.StringVar()
@@ -181,58 +157,70 @@ class YOLOGui:
         self.selected_media_device = tk.StringVar()
         self.setup_gui()
         self.refresh_media_devices()
-        self.refresh_model()
-    
+        self.refresh_models()
+        
     def setup_gui(self):
+        # Setup main GUI layout: left, center, right panels
         self.paned_window = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
         self.paned_window.pack(fill=tk.BOTH, expand=True)
         self.paned_window.bind('<B1-Motion>', lambda e: "break")
         self.paned_window.bind('<Button-1>', lambda e: "break")
+        # Left Panel
         self.left_frame = ttk.Frame(self.paned_window, width=400)
         self.left_frame.pack_propagate(True)
         self.paned_window.add(self.left_frame, weight=0)
         self.setup_left_panel(self.left_frame)
+        # Center Panel
         self.center_frame = ttk.Frame(self.paned_window)
         self.center_frame.pack_propagate(True)
         self.paned_window.add(self.center_frame, weight=1)
         self.setup_center_panel(self.center_frame)
+        # Right Panel
         self.right_frame = ttk.Frame(self.paned_window, width=350)
         self.right_frame.pack_propagate(True)
         self.paned_window.add(self.right_frame, weight=0)
         self.setup_right_panel(self.right_frame)
-    
+
+    # Left panel setup: source selection, model selection, and detection settings
     def setup_left_panel(self, parent):
         left_frame = ttk.LabelFrame(parent, text="Source Selection", padding=10)
         left_frame.pack(fill=tk.BOTH, expand=True, padx=(0, 2), pady=(0, 0))
+        # Input source selection
         ttk.Label(left_frame, text="Input Source:", font=('Arial', 10, 'bold')).pack(anchor=tk.W, pady=(0, 5))
         sources = ["Media Device", "RTSP Stream", "Video File", "Image File"]
         values = ["media_device", "rtsp", "video", "image"]
         for text, value in zip(sources, values):
-            ttk.Radiobutton(left_frame, text=text, variable=self.selected_source, value=value, command=self.on_source_change).pack(anchor=tk.W, pady=2)
+            ttk.Radiobutton(left_frame, text=text, variable=self.selected_source,
+                            value=value, command=self.on_source_change).pack(anchor=tk.W, pady=2)
         self.source_frame = ttk.Frame(left_frame)
         self.source_frame.pack(fill=tk.X, pady=10)
+        # RTSP input
         self.rtsp_frame = ttk.Frame(self.source_frame)
         ttk.Label(self.rtsp_frame, text="RTSP URL:").pack(anchor=tk.W)
         ttk.Entry(self.rtsp_frame, textvariable=self.rtsp_url, width=30).pack(fill=tk.X, pady=2)
+        # Media device input
         self.media_device_frame = ttk.Frame(self.source_frame)
         ttk.Label(self.media_device_frame, text="Select Media Device:").pack(anchor=tk.W)
-        self.media_device_combo = ttk.Combobox(self.media_device_frame, textvariable=self.selected_media_device, state="readonly")
+        self.media_device_combo = ttk.Combobox(
+            self.media_device_frame, textvariable=self.selected_media_device,state="readonly")
         self.media_device_combo.pack(fill=tk.X, pady=2)
+        # File input (video/image)
         self.file_frame = ttk.Frame(self.source_frame)
         for txt, cmd in [("Select Video File", self.select_video_file), ("Select Image File", self.select_image_file)]:
             ttk.Button(self.file_frame, text=txt, command=cmd).pack(fill=tk.X, pady=2)
         self.selected_file_label = ttk.Label(self.file_frame, text="No file selected", foreground="blue")
         self.selected_file_label.pack(fill=tk.X, pady=2)
         ttk.Separator(left_frame, orient='horizontal').pack(fill=tk.X, pady=10)
+        # Model selection
         ttk.Label(left_frame, text="Select Model:", font=('Arial', 10, 'bold')).pack(anchor=tk.W, pady=(0, 5))
         self.model_listbox = tk.Listbox(left_frame, height=5, exportselection=False)
         self.model_listbox.pack(fill=tk.X, pady=2)
         self.model_listbox.bind('<<ListboxSelect>>', self.on_model_select)
         ttk.Button(left_frame, text="Load Custom Model", command=self.load_custom_model_dialog).pack(fill=tk.X, pady=2)
         ttk.Entry(left_frame, textvariable=self.custom_model_path, width=30, state='readonly').pack(fill=tk.X, pady=2)
+        # Detection settings
         ttk.Label(left_frame, text="Detection Settings:", font=('Arial', 10, 'bold')).pack(anchor=tk.W, pady=(0, 5))
-        scale_width = 200
-        label_width = 18
+        scale_width, label_width = 200, 18
         for label, var, cmd, val in [
             ("Confidence Threshold:", self.conf_threshold, self.update_conf_label, "50%"),
             ("NMS Threshold:", self.nms_threshold, self.update_nms_label, "40%")
@@ -251,6 +239,7 @@ class YOLOGui:
             else:
                 self.nms_scale, self.nms_label = scale, lbl
         ttk.Separator(left_frame, orient='horizontal').pack(fill=tk.X, pady=10)
+        # Detection control buttons
         self.start_button = ttk.Button(left_frame, text="Start Detection", command=self.start_detection)
         self.start_button.pack(fill=tk.X, pady=2)
         self.stop_button = ttk.Button(left_frame, text="Stop Detection", command=self.stop_detection, state=tk.DISABLED)
@@ -258,14 +247,17 @@ class YOLOGui:
         ttk.Button(left_frame, text="Clear source", command=self.clear_source).pack(fill=tk.X, pady=2)
         self.on_source_change()
     
+    # Update the confidence threshold label when the slider is moved
     def update_conf_label(self, event=None):
         percent = int(self.conf_threshold.get() * 100)
         self.conf_label.config(text=f"{percent}%")
 
+    # Update the NMS threshold label when the slider is moved
     def update_nms_label(self, event=None):
         percent = int(self.nms_threshold.get() * 100)
         self.nms_label.config(text=f"{percent}%")
     
+    # Refresh the list of available media devices (webcams, etc.)
     def refresh_media_devices(self):
         self.media_device_combo['values'] = ["None"]
         self.selected_media_device.set("None")
@@ -330,15 +322,16 @@ class YOLOGui:
                 except Exception:
                     pass
     
-    def refresh_model(self):
+    def refresh_models(self):
+        main_py_path = Path(__file__).resolve().parent
+        models = [str(p) for p in main_py_path.glob("*.pt")]
         self.model_listbox.delete(0, tk.END)
-        model_names = self.detector.scan_available_model()
-        for name in model_names:
-            self.model_listbox.insert(tk.END, name)
-        if model_names and not self.selected_model.get():
+        for model in models:
+            self.model_listbox.insert(tk.END, model)
+        if models and not self.selected_model.get():
             self.model_listbox.selection_set(0)
             self.on_model_select(None)
-    
+
     def select_video_file(self):
         filename = filedialog.askopenfilename(title="Select Video File", filetypes=[("Video files", "*.mp4 *.avi *.mov *.mkv *.wmv")])
         if filename:
@@ -356,7 +349,7 @@ class YOLOGui:
                 self.display_frame(frame)
             else:
                 messagebox.showerror("Error", f"Could not load image: {filename}")
-    
+
     def process_image(self, image_path):
         if self.detector.model is None:
             messagebox.showerror("Error", "Please load a model first")
@@ -373,7 +366,7 @@ class YOLOGui:
             messagebox.showinfo("Success", f"Processed image with {len(detections)} detections")
         except Exception as e:
             messagebox.showerror("Error", f"Error processing image: {e}")
-    
+
     def start_detection(self):
         if self.detector.model is None:
             messagebox.showerror("Error", "Please load a model first")
@@ -406,11 +399,6 @@ class YOLOGui:
                 if not self.cap.isOpened():
                     messagebox.showerror("Error", f"Could not open video source: {selected}")
                     return
-                # Display first frame immediately
-                ret, frame = self.cap.read()
-                if ret and frame is not None:
-                    self.display_frame(frame)
-                    self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 self.is_running = True
                 self.start_button.config(state=tk.DISABLED)
                 self.stop_button.config(state=tk.NORMAL)
@@ -429,11 +417,6 @@ class YOLOGui:
                 if not self.cap.isOpened():
                     messagebox.showerror("Error", "Could not open video source")
                     return
-                # Display first frame immediately
-                ret, frame = self.cap.read()
-                if ret and frame is not None:
-                    self.display_frame(frame)
-                    self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 self.is_running = True
                 self.start_button.config(state=tk.DISABLED)
                 self.stop_button.config(state=tk.NORMAL)
@@ -450,19 +433,13 @@ class YOLOGui:
                 if not self.cap.isOpened():
                     messagebox.showerror("Error", "Could not open video source")
                     return
-                # Display first frame immediately to reduce perceived delay
-                ret, frame = self.cap.read()
-                if ret and frame is not None:
-                    self.display_frame(frame)
-                    self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # Reset to first frame for processing
                 self.is_running = True
                 self.start_button.config(state=tk.DISABLED)
                 self.stop_button.config(state=tk.NORMAL)
                 self.status_label.config(text="Status: Running")
                 self.source_display_label.config(text=f"Source: {self.current_source}")
                 self.source_path_label.config(text=f"Source Path: {self.current_source}")
-                self.processing_thread = threading.Thread(target=self.process_video, daemon=True)
-                self.processing_thread.start()
+                self.processing_thread = threading.Thread(target=self.process_video, daemon=True); self.processing_thread.start()
             elif source_type == "image":
                 if not self.current_source:
                     messagebox.showerror("Error", "Please select an image file")
@@ -479,12 +456,12 @@ class YOLOGui:
             else:
                 messagebox.showerror("Error", "Unknown source type")
                 return
-        except Exception as e: 
+        except Exception as e:
             messagebox.showerror("Error", f"Error starting detection: {e}")
-    
+
     def stop_detection(self):
         self.is_running = False
-        if self.cap: 
+        if self.cap:
             self.cap.release()
         self.start_button.config(state=tk.NORMAL)
         self.stop_button.config(state=tk.DISABLED)
@@ -492,8 +469,7 @@ class YOLOGui:
         self.fps_label.config(text="FPS: 0")
     
     def process_video(self):
-        fps_counter = 0
-        fps_start_time = time.time()
+        fps_counter, fps_start_time = 0, time.time()
         resize_width, resize_height = 1024, 768
         if self.cap is not None:
             source_fps = self.cap.get(cv2.CAP_PROP_FPS)
@@ -536,7 +512,7 @@ class YOLOGui:
             new_width = int(new_height * aspect_ratio)
             if new_width > label_width - 10:
                 new_width = label_width - 10
-            new_height = int(new_width / aspect_ratio)
+                new_height = int(new_width / aspect_ratio)
             frame_resized = cv2.resize(frame_rgb, (new_width, new_height))
         else:
             frame_resized = frame_rgb
@@ -604,28 +580,24 @@ class YOLOGui:
     def on_model_select(self, event):
         selection = self.model_listbox.curselection()
         if selection:
-            model_name = self.model_listbox.get(selection[0])
-            self.selected_model.set(model_name)
-            # Use absolute path for both model and models
-            for model_dir in [Path(__file__).parent / "model", Path(__file__).parent / "models"]:
-                candidate_path = model_dir / model_name
-                if candidate_path.exists():
-                    if self.detector.load_model(str(candidate_path)):
-                        self.model_label.config(text=f"Model: {model_name}")
-                        self.update_gpu_status()
-                        messagebox.showinfo("Success", f"Model loaded: {model_name}")
-                        return
-            messagebox.showerror("Error", f"Failed to load model: {model_name}")
-
+            model_path = self.model_listbox.get(selection[0])
+            self.selected_model.set(model_path)
+            if self.detector.load_model(model_path):
+                self.model_label.config(text=f"Model: {os.path.basename(model_path)}")
+                self.update_gpu_status()
+                messagebox.showinfo("Success", f"Model loaded: {model_path}")
+            else:
+                messagebox.showerror("Error", f"Failed to load model: {model_path}")
+    
     def load_custom_model_dialog(self):
         filename = filedialog.askopenfilename(title="Select YOLO Model File", filetypes=[("YOLO model files", "*.pt")])
         if filename:
             self.custom_model_path.set(filename)
             if self.detector.load_model(filename):
-                self.model_label.config(text=f"Model:{os.path.basename(filename)}")
+                self.model_label.config(text=f"Model: {os.path.basename(filename)}")
                 self.update_gpu_status()
                 messagebox.showinfo("Success", f"Custom model loaded: {filename}")
-                if filename not in self.model_listbox.get(0, tk.END): 
+                if filename not in self.model_listbox.get(0, tk.END):
                     self.model_listbox.insert(tk.END, filename)
                 idx = self.model_listbox.get(0, tk.END).index(filename)
                 self.model_listbox.selection_clear(0, tk.END)
@@ -648,16 +620,16 @@ class YOLOGui:
             messagebox.showinfo("Success", f"Statistics saved to: {filename}")
         except Exception as e:
             messagebox.showerror("Error", f"Error saving statistics: {e}")
-    
+
     def clear_source(self):
         self.detector.reset_source()
         self.update_detection_display()
         self.selected_source.set("media_device")
-        self.selected_media_device.set(""); self.rtsp_url.set("")
+        self.selected_media_device.set("")
+        self.rtsp_url.set("")
         self.current_source = None
         self.selected_file_label.config(text="No file selected")
         self.on_source_change()
-        self.refresh_model()
         self.source_display_label.config(text="Source: None")
         self.source_path_label.config(text="Source Path: None")
         self.video_label.config(image='', text="Video output will appear here", bg="#000000", fg="white")
@@ -675,12 +647,13 @@ class YOLOGui:
         detections = self.detector.get_current_detections()
         for class_name, stats in self.detector.detection_stats.items():
             current_count = stats['current_count']
-            total_count = stats['total_count']; avg_conf = stats['avg_confidence']
+            total_count = stats['total_count']
+            avg_conf = stats['avg_confidence']
             self.detection_tree.insert('', 'end', values=(class_name, current_count, total_count, f"{avg_conf:.2f}"))
         session_stats = self.detector.get_session_stats()
         self.session_time_label.config(text=f"Session Time: {session_stats['sessionTime']}")
         self.total_detections_label.config(text=f"Total Detections: {session_stats['totalDetections']}")
-    
+
     def run(self):
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.root.mainloop()
