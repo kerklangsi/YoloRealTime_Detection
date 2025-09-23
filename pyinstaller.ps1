@@ -1,3 +1,6 @@
+# Suppress PSScriptAnalyzer warning for existModuleName variable
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', 'existModuleName',
+    Justification = 'variable is used in another scope')]
 # General build script for YoloRealTime_Detection using PyInstaller
 # Place this file in the project root and run in PowerShell:
 #   ./build.ps1
@@ -27,6 +30,7 @@ if (Test-Path $include) {
     $hiddenImports = @()
     Write-Host "ERROR: $include not found. Please place it in the current folder." -ForegroundColor Red
 }
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', 'hiddenImportArgs', Justification = 'variable is used in another scope')]
 $hiddenImportArgs = ($hiddenImports | ForEach-Object { "--hidden-import $_" }) -join " "
 
 # Read excluded modules from exclude.txt
@@ -36,6 +40,7 @@ if (Test-Path $exclude) {
     $excludedModules = @()
     Write-Host "WARNING: $exclude not found. No modules will be excluded." -ForegroundColor Yellow
 }
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', 'excludedModulesArgs', Justification = 'variable is used in another scope')]
 $excludedModulesArgs = ($excludedModules | ForEach-Object { "--exclude-module $_" }) -join " "
 
 # Build argument array for PyInstaller
@@ -92,5 +97,8 @@ if ($confirm -ne 'Y' -and $confirm -ne 'y') {
 # Run PyInstaller
 Write-Host "Building..." -ForegroundColor Green
 pyinstaller @pyinstallerArgs
+Write-Host "Copying icon to output folder..." -ForegroundColor Green
+$outputDir = Join-Path -Path "dist" -ChildPath $name
+Copy-Item -Path $icon -Destination $outputDir -Force
 Write-Host "Build finished." -ForegroundColor Green
 Pause
