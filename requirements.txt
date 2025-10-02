@@ -1,0 +1,9 @@
+numpy
+torch
+torchvision
+torchaudio
+opencv-python
+ultralytics
+pillow
+pygrabber
+tk

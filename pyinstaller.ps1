@@ -1,9 +1,5 @@
-# Suppress PSScriptAnalyzer warning for existModuleName variable
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', 'existModuleName',
     Justification = 'variable is used in another scope')]
-# General build script for YoloRealTime_Detection using PyInstaller
-# Place this file in the project root and run in PowerShell:
-#   ./build.ps1
 
 $pythonFiles   = Get-ChildItem -Filter *.py | Select-Object -First 1
 $iconFiles     = Get-ChildItem -Filter *.ico | Select-Object -First 1
@@ -51,7 +47,7 @@ $pyinstallerArgs += "--onedir"
 $pyinstallerArgs += "--noconsole"
 $pyinstallerArgs += "--icon=$icon"
 $pyinstallerArgs += "--contents-directory"
-$pyinstallerArgs += '"' + "." + '"'
+$pyinstallerArgs += '"' + "bin" + '"'
 
 # Add excluded modules
 if ($excludedModules.Count -gt 0) {
@@ -64,7 +60,7 @@ if ($excludedModules.Count -gt 0) {
 $folders = Get-ChildItem -Directory | Where-Object { $_.Name -ne '.git' -and $_.Name -ne '__pycache__' }
 foreach ($folder in $folders) {
     $pyinstallerArgs += "--add-data"
-    $pyinstallerArgs += '"' + "$($folder.Name);$($folder.Name)" + '"'
+    $pyinstallerArgs += '"' + "$($folder.Name);." + '"'
 }
 
 # Add hidden imports
