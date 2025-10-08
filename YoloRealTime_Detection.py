@@ -702,8 +702,8 @@ class YOLOGui:
         self.root.title("YOLO Object Detection GUI")
         icon_path = Path(__file__).resolve().parent / "icon.ico"
         self.root.iconbitmap(str(icon_path))
-        self.root.geometry("1480x730")
-        self.root.minsize(1480, 750)
+        self.root.geometry("1500x700")
+        self.root.minsize(1500, 700)
         self.root.configure(bg="#ffffff")
         self.cap, self.running = None, False
         self.current_source, self.processing_thread = None, None
