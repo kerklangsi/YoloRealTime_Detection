@@ -1,9 +1,7 @@
 numpy
 torch
-torchvision
-torchaudio
 opencv-python
 ultralytics
-pillow
+Pillow
 pygrabber
-tk
+tkinter
