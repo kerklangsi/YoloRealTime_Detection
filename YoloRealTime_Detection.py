@@ -542,8 +542,8 @@ class YOLOProcess:
             annotated_frame, detections = self.gui.detector.objects(frame, self.gui.conf_threshold.get(), self.gui.nms_threshold.get())
             self.gui.root.after(0, lambda f=annotated_frame: self.display_frame(f))
             self.gui.root.after(0, self.gui.detection_display)
-            # Skip 1.5 frames
-            for _ in range(1.5):
+            # Skip 2 frames
+            for _ in range(2):
                 if self.cap.isOpened():
                     self.cap.read()
             fps_counter += 1
