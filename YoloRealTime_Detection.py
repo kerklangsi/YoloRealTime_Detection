@@ -1,4 +1,4 @@
-import os,cv2,time,threading,sys,json,numpy as np, torch
+import os,cv2,time,threading,sys,json,numpy as np,torch,socket,subprocess,signal
 from pathlib import Path
 from datetime import datetime
 from typing import Dict,List,Optional,Tuple
@@ -17,7 +17,7 @@ class YOLOModel:
         self.model = None
         self.model_path = None
         self.class_names = []
-        self.device_str = "Unknown"
+        self.device_str = "UNKNOWN"
     # Scan for available YOLO models in a directory
     def scan_available_models(self, model_dir: Optional[Path] = None) -> List[str]:
         if model_dir is None:
@@ -48,29 +48,45 @@ class YOLOStats:
     def __init__(self):
         self.detection_stats = {}
         self.total_detections = 0
-        self.session_start_time = None
+        self.session_start = None
     # Reset statistics
     def reset(self):
         self.detection_stats = {}
         self.total_detections = 0
-        self.session_start_time = datetime.now()
+        self.session_start = datetime.now()
     # Update detection statistics
-    def update_detection_stats(self, class_name: str, confidence: float):
+    def update_detection_stats(self, class_name: str, confidence: float, bbox: Optional[List[int]] = None):
         if class_name not in self.detection_stats:
             self.detection_stats[class_name] = {
                 'total_count': 0,
                 'current_count': 0,
                 'avg_confidence': 0.0,
-                'confidence_sum': 0.0
+                'confidence_sum': 0.0,
+                'last_bboxes': []
             }
         stats = self.detection_stats[class_name]
-        stats['total_count'] += 1
         stats['current_count'] += 1
         stats['confidence_sum'] += confidence
-        stats['avg_confidence'] = stats['confidence_sum'] / stats['total_count']
-        self.total_detections += 1
+        stats['avg_confidence'] = stats['confidence_sum'] / (stats['total_count'] + 1)
+        is_new_location = True
+        if bbox is not None:
+            # Check if this bbox is close to any previous bbox (center distance < 100px)
+            x1, y1, x2, y2 = bbox
+            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+            for prev_bbox in stats['last_bboxes']:
+                px1, py1, px2, py2 = prev_bbox
+                pcx, pcy = (px1 + px2) // 2, (py1 + py2) // 2
+                if abs(cx - pcx) < 100 and abs(cy - pcy) < 100:
+                    is_new_location = False
+                    break
+            stats['last_bboxes'].append(bbox)
+            if len(stats['last_bboxes']) > 20:
+                stats['last_bboxes'] = stats['last_bboxes'][-20:]
+        if is_new_location:
+            stats['total_count'] += 1
+            self.total_detections += 1
     # Reset current detection counts
-    def reset_current_counts(self):
+    def reset_counts(self):
         [stats.update({'current_count': 0}) for stats in self.detection_stats.values()]
     # Get current detections
     def get_current_detections(self) -> List[Dict]:
@@ -81,9 +97,9 @@ class YOLOStats:
         return detections
     # Get session statistics
     def get_session_stats(self, model_path: Optional[str] = None) -> Dict:
-        if self.session_start_time is None:
-            self.session_start_time = datetime.now()
-        session_time = datetime.now() - self.session_start_time
+        if self.session_start is None:
+            self.session_start = datetime.now()
+        session_time = datetime.now() - self.session_start
         return {
             'modelName': os.path.basename(model_path) if model_path else 'No model',
             'totalDetections': self.total_detections,
@@ -122,7 +138,7 @@ class YOLODetector:
     def __init__(self):
         self.model_manager = YOLOModel()
         self.stats_manager = YOLOStats()
-        self.is_running = False
+        self.running = False
     # Load a YOLO model
     def load_model(self, model_path: str) -> bool:
         loaded = self.model_manager.load_model(model_path)
@@ -130,20 +146,20 @@ class YOLODetector:
             self.stats_manager.reset()
         return loaded
     # Perform object detection on a frame
-    def detect_objects(self, frame: np.ndarray, conf_threshold: float = 0.5, nms_threshold: float = 0.4) -> Tuple[np.ndarray, List[Dict]]:
+    def objects(self, frame: np.ndarray, conf_threshold: float = 0.5, nms_threshold: float = 0.4) -> Tuple[np.ndarray, List[Dict]]:
         model = self.model_manager.model
         class_names = self.model_manager.class_names
         if model is None:
             return frame, []
         try:
             results = model(frame, conf=conf_threshold, iou=nms_threshold)
-            annotated_frame, detections = self._process_results(frame, results[0], class_names)
+            annotated_frame, detections = self.process_results(frame, results[0], class_names)
             return annotated_frame, detections
         except Exception as e:
             print(f"Error during detection: {e}")
             return frame, []
     # Process detection results and annotate frame
-    def _process_results(self, frame: np.ndarray, result, class_names: List[str]) -> Tuple[np.ndarray, List[Dict]]:
+    def process_results(self, frame: np.ndarray, result, class_names: List[str]) -> Tuple[np.ndarray, List[Dict]]:
         detections, annotated_frame = [], frame.copy()
         if result.boxes is not None:
             boxes = result.boxes.xyxy.cpu().numpy()
@@ -155,7 +171,7 @@ class YOLODetector:
                     class_name = class_names[class_id]
                 else:
                     class_name = f"class_{class_id}"
-                self.stats_manager.update_detection_stats(class_name, conf)
+                self.stats_manager.update_detection_stats(class_name, conf, [int(x1), int(y1), int(x2), int(y2)])
                 cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 label = f"{class_name}: {conf:.2f}"
                 label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
@@ -164,8 +180,8 @@ class YOLODetector:
                 detections.append({'class': class_name,'confidence': float(conf), 'bbox': [int(x1), int(y1), int(x2), int(y2)]})
         return annotated_frame, detections
     # Reset current detection counts
-    def reset_current_counts(self):
-        self.stats_manager.reset_current_counts()
+    def reset_counts(self):
+        self.stats_manager.reset_counts()
     # Reset statistics
     def reset_source(self):
         self.stats_manager.reset()
@@ -186,7 +202,7 @@ class YOLOSource:
     # Initialize media device list
     def refresh_media_devices(self):
         self.gui.media_device_combo['values'] = ["None"]
-        self.gui.selected_media_device.set("None")
+        self.gui.selected_device.set("None")
         if self.gui.selected_source.get() == "media_device":
             devices = []
             if sys.platform == 'win32' and FilterGraph is not None:
@@ -204,7 +220,7 @@ class YOLOSource:
             if devices:
                 self.gui.media_device_combo['values'] = ["None"] + devices
                 self.gui.media_device_combo.current(0)
-                self.gui.selected_media_device.set("None")
+                self.gui.selected_device.set("None")
     # Initialize model list
     def refresh_models(self):
         model_dir = Path(__file__).resolve().parent / "model"
@@ -221,28 +237,34 @@ class YOLOSource:
         filename = filedialog.askopenfilename(title="Select Video File", filetypes=[("Video files", "*.mp4 *.avi *.mov *.mkv *.wmv")])
         if filename:
             self.gui.current_source = filename
-            self.gui.selected_file_label.config(text=filename)
+            self.gui.file_label.config(text=filename)
             messagebox.showinfo("Success", f"Video file selected: {os.path.basename(filename)}")
     # Select image file
     def select_image_file(self):
         filename = filedialog.askopenfilename(title="Select Image File", filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp *.tiff")])
         if filename:
             self.gui.current_source = filename
-            self.gui.selected_file_label.config(text=filename)
+            self.gui.file_label.config(text=filename)
             frame = cv2.imread(filename)
             if frame is not None:
-                self.gui.detection_manager.display_frame(frame)
+                self.gui.yolo_process.display_frame(frame)
             else:
                 messagebox.showerror("Error", f"Could not load image: {filename}")
+    def select_folder(self):
+        foldername = filedialog.askdirectory(title="Select Folder")
+        if foldername:
+            self.gui.current_source = foldername
+            self.gui.file_label.config(text=foldername)
+            messagebox.showinfo("Success", f"Folder selected: {os.path.basename(foldername)}")
     # Handle source type change
     def on_source_change(self):
         for frame in [self.gui.rtsp_frame, self.gui.file_frame, self.gui.media_device_frame]:
             frame.pack_forget()
         source = self.gui.selected_source.get()
-        # Display a test frame from the RTSP stream
+        # Display frame from the RTSP stream
         if source == "rtsp":
             self.gui.rtsp_frame.pack(fill=tk.X, pady=5)
-        # Display a test frame from the selected video file
+        # Display frame from the selected video file
         elif source == "video":
             self.gui.file_frame.pack(fill=tk.X, pady=5)
             for child in self.gui.file_frame.winfo_children():
@@ -251,9 +273,9 @@ class YOLOSource:
                         child.pack(fill=tk.X, pady=2)
                     else:
                         child.pack_forget()
-            self.gui.selected_file_label.pack_forget()
-            self.gui.selected_file_label.pack(fill=tk.X, pady=(2, 0))
-        # Display a test frame from the selected image file
+            self.gui.file_label.pack_forget()
+            self.gui.file_label.pack(fill=tk.X, pady=(2, 0))
+        # Display frame from the selected image file
         elif source == "image":
             self.gui.file_frame.pack(fill=tk.X, pady=5)
             for child in self.gui.file_frame.winfo_children():
@@ -262,13 +284,34 @@ class YOLOSource:
                         child.pack(fill=tk.X, pady=2)
                     else:
                         child.pack_forget()
-            self.gui.selected_file_label.pack_forget()
-            self.gui.selected_file_label.pack(fill=tk.X, pady=(2, 0))
-        # Display a test frame from the selected media device
+            self.gui.file_label.pack_forget()
+            self.gui.file_label.pack(fill=tk.X, pady=(2, 0))
+        # Display only the folder selection button for 'Folder' source
+        elif source == "folder":
+            self.gui.file_frame.pack(fill=tk.X, pady=5)
+            for child in self.gui.file_frame.winfo_children():
+                if isinstance(child, ttk.Button):
+                    if child.cget('text') == 'Select Folder':
+                        child.pack(fill=tk.X, pady=2)
+                    else:
+                        child.pack_forget()
+            self.gui.file_label.pack_forget()
+            self.gui.file_label.pack(fill=tk.X, pady=(2, 0))
+        # Display frame from the selected folder
+        elif source == "folder":
+            self.gui.file_frame.pack(fill=tk.X, pady=5)
+            folder = self.gui.current_source
+            if folder and os.path.isdir(folder):
+                images = [f for f in os.listdir(folder) if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))]
+                if images:
+                    self.gui.file_label.config(text=f"{len(images)} images found")
+                else:
+                    self.gui.file_label.config(text="No images found")
+        # Display frame from the selected media device
         elif source == "media_device":
             self.gui.media_device_frame.pack(fill=tk.X, pady=5)
             self.refresh_media_devices()
-            selected = self.gui.selected_media_device.get()
+            selected = self.gui.selected_device.get()
             if selected and selected != "None":
                 try:
                     idx = int(selected.split()[-1])
@@ -323,21 +366,20 @@ class YOLODetection:
     def __init__(self, gui):
         self.gui = gui
         self.cap = None
-        self.is_running = False
+        self.running = False
         self.processing_thread = None
     # Start detection based on selected source
     def start_detection(self):
-        detector = self.gui.detector
-        if detector.model_manager.model is None:
+        if self.gui.detector.model_manager.model is None:
             messagebox.showerror("Error", "Please load a model first")
             return
-        if self.is_running:
+        if self.running:
             return
         source_type = self.gui.selected_source.get()
         try:
             # Handle different source types
             if source_type == "media_device":
-                selected = self.gui.selected_media_device.get()
+                selected = self.gui.selected_device.get()
                 if not selected or selected == "None":
                     messagebox.showerror("Error", "No media device selected")
                     return
@@ -357,18 +399,21 @@ class YOLODetection:
                     messagebox.showerror("Error", f"Could not resolve device index for: {selected}")
                     return
                 self.cap = cv2.VideoCapture(device_index, cv2.CAP_DSHOW)
+                
                 if not self.cap.isOpened():
                     messagebox.showerror("Error", f"Could not open video source: {selected}")
                     return
-                self.is_running = True
-                self.gui.disable_source_selection()
+                self.running = True
+                self.gui.yolo_process.cap = self.cap
+                self.gui.yolo_process.running = True
+                self.gui.disable_source()
                 self.gui.start_button.config(state=tk.DISABLED)
                 self.gui.stop_button.config(state=tk.NORMAL)
                 self.gui.status_label.config(text="Status: Running")
-                source_text = self.gui.selected_media_device.get()
-                self.gui.source_display_label.config(text=f"Source: {source_text}")
-                self.gui.source_path_label.config(text=f"Source Path: {source_text}")
-                self.processing_thread = threading.Thread(target=self.process_video, daemon=True)
+                source_text = self.gui.selected_device.get()
+                self.gui.display_label.config(text=f"Source: {source_text}")
+                self.gui.path_label.config(text=f"Source Path: {source_text}")
+                self.processing_thread = threading.Thread(target=self.gui.yolo_process.process_video, daemon=True)
                 self.processing_thread.start()
             # RTSP stream
             elif source_type == "rtsp":
@@ -376,18 +421,21 @@ class YOLODetection:
                 if not rtsp_url:
                     messagebox.showerror("Error", "Please enter RTSP URL")
                     return
-                self.cap = cv2.VideoCapture(rtsp_url)
+                self.cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+                self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 2) 
                 if not self.cap.isOpened():
                     messagebox.showerror("Error", f"Could not open RTSP stream: {rtsp_url}")
                     return
-                self.is_running = True
-                self.gui.disable_source_selection()
+                self.running = True
+                self.gui.yolo_process.cap = self.cap
+                self.gui.yolo_process.running = True
+                self.gui.disable_source()
                 self.gui.start_button.config(state=tk.DISABLED)
                 self.gui.stop_button.config(state=tk.NORMAL)
                 self.gui.status_label.config(text="Status: Running")
-                self.gui.source_display_label.config(text=f"Source: {rtsp_url}")
-                self.gui.source_path_label.config(text=f"Source Path: {rtsp_url}")
-                self.processing_thread = threading.Thread(target=self.process_video, daemon=True)
+                self.gui.display_label.config(text=f"Source: {rtsp_url}")
+                self.gui.path_label.config(text=f"Source Path: {rtsp_url}")
+                self.processing_thread = threading.Thread(target=self.gui.yolo_process.process_video, daemon=True)
                 self.processing_thread.start()
             # Video file
             elif source_type == "video":
@@ -398,14 +446,16 @@ class YOLODetection:
                 if not self.cap.isOpened():
                     messagebox.showerror("Error", "Could not open video source")
                     return
-                self.is_running = True
-                self.gui.disable_source_selection()
+                self.running = True
+                self.gui.yolo_process.cap = self.cap
+                self.gui.yolo_process.running = True
+                self.gui.disable_source()
                 self.gui.start_button.config(state=tk.DISABLED)
                 self.gui.stop_button.config(state=tk.NORMAL)
                 self.gui.status_label.config(text="Status: Running")
-                self.gui.source_display_label.config(text=f"Source: {self.gui.current_source}")
-                self.gui.source_path_label.config(text=f"Source Path: {self.gui.current_source}")
-                self.processing_thread = threading.Thread(target=self.process_video, daemon=True)
+                self.gui.display_label.config(text=f"Source: {self.gui.current_source}")
+                self.gui.path_label.config(text=f"Source Path: {self.gui.current_source}")
+                self.processing_thread = threading.Thread(target=self.gui.yolo_process.process_video, daemon=True)
                 self.processing_thread.start()
             # Image file
             elif source_type == "image":
@@ -416,11 +466,32 @@ class YOLODetection:
                 if frame is None:
                     messagebox.showerror("Error", f"Could not load image: {self.gui.current_source}")
                     return
-                detector.reset_current_counts()
-                annotated_frame, detections = detector.detect_objects(frame, self.gui.conf_threshold.get(), self.gui.nms_threshold.get())
-                self.display_frame(annotated_frame)
+                self.gui.detector.reset_counts()
+                annotated_frame, detections = self.gui.detector.objects(frame, self.gui.conf_threshold.get(), self.gui.nms_threshold.get())
+                self.gui.yolo_process.display_frame(annotated_frame)
                 self.gui.detection_display()
                 messagebox.showinfo("Success", f"Processed image with {len(detections)} detections")
+            # Image folder
+            elif source_type == "folder":
+                folder = self.gui.current_source
+                if not folder or not os.path.isdir(folder):
+                    messagebox.showerror("Error", "Please select a valid image folder")
+                    return
+                images = [f for f in os.listdir(folder) if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))]
+                if not images:
+                    messagebox.showerror("Error", "No images found in folder")
+                    return
+                result_dir = os.path.join(folder, "result")
+                os.makedirs(result_dir, exist_ok=True)
+                total = len(images)
+                processed_count = 0
+                self.gui.yolo_process.running = True
+                self.gui.disable_source()
+                self.gui.start_button.config(state=tk.DISABLED)
+                self.gui.stop_button.config(state=tk.NORMAL)
+                self.gui.status_label.config(text="Status: Running")
+                self.processing_thread = threading.Thread(target=lambda: self.gui.yolo_process.process_folder(images, folder, result_dir, total), daemon=True)
+                self.processing_thread.start()
             else:
                 messagebox.showerror("Error", "Unknown source type")
                 return
@@ -428,9 +499,9 @@ class YOLODetection:
             messagebox.showerror("Error", f"Error starting detection: {e}")
     # Stop detection and release resources
     def stop_detection(self):
-        if not self.is_running:
+        if not self.running:
             return
-        self.is_running = False
+        self.running = False
         if self.cap:
             try:
                 self.cap.release()
@@ -442,10 +513,16 @@ class YOLODetection:
         self.gui.clear_video_image()
         self.gui.status_label.config(text="Status: Stopped")
         self.gui.fps_label.config(text="FPS: 0")
-        self.gui.enable_source_selection()
+        self.gui.enable_source()
+# processing source class
+class YOLOProcess:
+    def __init__(self, gui):
+        self.gui = gui
+        self.cap = None
+        self.gui.detection_manager.running = False
+        self.processing_thread = None
     # Video processing loop
     def process_video(self):
-        detector = self.gui.detector
         fps_counter, fps_start_time = 0, time.time()
         resize_width, resize_height = 1024, 768
         if self.cap is not None:
@@ -455,16 +532,20 @@ class YOLODetection:
         else:
             source_fps = 30.0
         frame_time = 1.0 / source_fps
-        while self.is_running and self.cap and self.cap.isOpened():
+        while self.gui.detection_manager.running and self.cap and self.cap.isOpened():
             start_time = time.time()
             ret, frame = self.cap.read()
             if not ret:
                 break
             frame = cv2.resize(frame, (resize_width, resize_height))
-            detector.reset_current_counts()
-            annotated_frame, detections = detector.detect_objects(frame, self.gui.conf_threshold.get(), self.gui.nms_threshold.get())
+            self.gui.detector.reset_counts()
+            annotated_frame, detections = self.gui.detector.objects(frame, self.gui.conf_threshold.get(), self.gui.nms_threshold.get())
             self.gui.root.after(0, lambda f=annotated_frame: self.display_frame(f))
             self.gui.root.after(0, self.gui.detection_display)
+            # Skip 1.5 frames
+            for _ in range(1.5):
+                if self.cap.isOpened():
+                    self.cap.read()
             fps_counter += 1
             if fps_counter % 30 == 0:
                 elapsed = time.time() - fps_start_time
@@ -475,8 +556,8 @@ class YOLODetection:
             sleep_time = frame_time - elapsed_time
             if sleep_time > 0:
                 time.sleep(sleep_time)
-        if self.is_running:
-            self.gui.root.after(0, self.stop_detection)
+        if self.gui.detection_manager.running:
+            self.gui.root.after(0, self.gui.detection_manager.stop_detection)
     # Display frame in video label
     def display_frame(self, frame):
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -488,9 +569,32 @@ class YOLODetection:
             max_height = label_height - 10
             new_height = max_height
             new_width = int(new_height * aspect_ratio)
-            if new_width > label_width - 10:
-                new_width = label_width - 10
-                new_height = int(new_width / aspect_ratio)
+            source_type = self.gui.selected_source.get()
+            # Use source_type to determine correct label
+            if source_type == "rtsp":
+                # RTMP or RTSP
+                if hasattr(self.gui, 'rtmp_enabled') and self.gui.rtmp_enabled.get() and self.gui.rtmp_url.get():
+                    url = self.gui.rtmp_url.get().strip()
+                else:
+                    url = self.gui.rtsp_url.get().strip()
+                self.gui.display_label.config(text=f"Source: {url}")
+                self.gui.path_label.config(text=f"Source Path: {url}")
+            elif source_type == "video" or source_type == "image" or source_type == "folder":
+                if self.gui.current_source is not None:
+                    file_name = os.path.basename(self.gui.current_source)
+                    source_path = self.gui.current_source
+                else:
+                    file_name = "None"
+                    source_path = "None"
+                self.gui.display_label.config(text=f"Source: {file_name}")
+                self.gui.path_label.config(text=f"Source Path: {source_path}")
+            elif source_type == "media_device":
+                device = self.gui.selected_device.get()
+                self.gui.display_label.config(text=f"Source: {device}")
+                self.gui.path_label.config(text=f"Source Path: {device}")
+            else:
+                self.gui.display_label.config(text="Source: None")
+                self.gui.path_label.config(text="Source Path: None")
             frame_resized = cv2.resize(frame_rgb, (new_width, new_height))
         else:
             frame_resized = frame_rgb
@@ -498,16 +602,102 @@ class YOLODetection:
         photo = ImageTk.PhotoImage(pil_image)
         self.gui.video_label.configure(image=photo)
         self.gui.current_photo = photo
+    # Process image folder
+    def process_folder(self, images, folder, result_dir, total):
+        processed_count = 0
+        self.gui.detection_manager.running = True
+        for idx, img_name in enumerate(images):
+            if not self.gui.detection_manager.running:
+                break
+            img_path = os.path.join(folder, img_name)
+            frame = cv2.imread(img_path)
+            if frame is None:
+                continue
+            self.gui.detector.reset_counts()
+            annotated_frame, detections = self.gui.detector.objects(frame, self.gui.conf_threshold.get(), self.gui.nms_threshold.get())
+            # Save result image with object classes drawn
+            result_path = os.path.join(result_dir, img_name)
+            cv2.imwrite(result_path, annotated_frame)
+            processed_count += 1
+            # Overlay percentage and annotation count for GUI preview only
+            preview_frame = annotated_frame.copy()
+            percent = int((idx+1)/total*100)
+            percent_text = f"{percent}%"
+            count_text = f"{idx+1}/{total}"
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 1.0
+            thickness = 2
+            # Percentage (top left)
+            pt_x, pt_y = 20, 50
+            text_size, _ = cv2.getTextSize(percent_text, font, font_scale, thickness)
+            bg_rect = (pt_x-5, pt_y-text_size[1]-5, pt_x+text_size[0]+5, pt_y+10)
+            cv2.rectangle(preview_frame, (bg_rect[0], bg_rect[1]), (bg_rect[2], bg_rect[3]), (0,0,0), -1)
+            cv2.putText(preview_frame, percent_text, (pt_x, pt_y), font, font_scale, (255,255,255), thickness, cv2.LINE_AA)
+            # Count (top right)
+            img_w = preview_frame.shape[1]
+            text_size2, _ = cv2.getTextSize(count_text, font, font_scale, thickness)
+            ct_x = img_w - text_size2[0] - 20
+            ct_y = 50
+            bg_rect2 = (ct_x-5, ct_y-text_size2[1]-5, ct_x+text_size2[0]+5, ct_y+10)
+            cv2.rectangle(preview_frame, (bg_rect2[0], bg_rect2[1]), (bg_rect2[2], bg_rect2[3]), (0, 0, 0), -1)
+            cv2.putText(preview_frame, count_text, (ct_x, ct_y), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
+            # Preview in GUI
+            self.display_frame(preview_frame)
+            self.gui.root.update_idletasks()
+        def show_result():
+            if processed_count == total:
+                messagebox.showinfo("Success", f"Processed {processed_count} images. Results saved in result.")
+            else:
+                messagebox.showinfo("Stopped", f"Stopped early. {processed_count} images processed and saved in result.")
+        self.gui.root.after(0, show_result)
+    # Update RTMP URL
+    def update_rtmp_url(self):
+        mediamtx_path = os.path.join(os.path.dirname(__file__), 'mediamtx', 'mediamtx.exe')
+        if self.gui.rtmp_enabled.get():
+            # RTMP enabled: start mediamtx and set RTMP URL
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                ip = s.getsockname()[0]
+                s.close()
+            except Exception:
+                ip = "127.0.0.1"
+            rtsp_url = f"rtmp://{ip}:1935/live"
+            self.gui.rtsp_url.set(rtsp_url)
+            # Start mediamtx only if not already running
+            if not hasattr(self.gui, 'mediamtx_proc') or self.gui.mediamtx_proc is None:
+                try:
+                    mediamtx_dir = os.path.join(os.path.dirname(__file__), 'mediamtx')
+                    creationflags = 0
+                    if sys.platform == 'win32':
+                        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+                    self.gui.mediamtx_proc = subprocess.Popen(
+                        f'"{mediamtx_path}"', shell=True, cwd=mediamtx_dir, creationflags=creationflags)
+                except Exception as e:
+                    messagebox.showerror("mediamtx Error", f"Could not start mediamtx: {e}")
+        else:
+            # RTMP disabled: stop mediamtx and clear RTSP URL
+            self.gui.rtsp_url.set("")
+            if hasattr(self.gui, 'mediamtx_proc') and self.gui.mediamtx_proc:
+                try:
+                    if sys.platform == 'win32':
+                        self.gui.mediamtx_proc.send_signal(signal.CTRL_BREAK_EVENT)
+                    else:
+                        self.gui.mediamtx_proc.send_signal(signal.SIGINT)
+                except Exception:
+                    pass
+                self.gui.mediamtx_proc = None
+            messagebox.showinfo("Success", "RTMP stopped")
 # GUI statistics panel class
 class YOLOStatsPanel:
     def __init__(self, gui):
         self.gui = gui
     def update_gpu_status(self):
-        device_str = getattr(self.gui.detector, 'device_str', None)
-        if device_str:
-            self.gui.gpu_status_label.config(text=f"Device: {device_str}")
+        device_str = getattr(self.gui.detector.model_manager, 'device_str', None)
+        if device_str and device_str != "Unknown":
+            self.gui.gpu_label.config(text=f"Device: {device_str}")
         else:
-            self.gui.gpu_status_label.config(text="Device: Unknown")
+            self.gui.gpu_label.config(text="Device: CPU")
     # Save statistics to file
     def save_statistics(self):
         try:
@@ -532,28 +722,30 @@ class YOLOGui:
                 self.root.iconbitmap(str(icon_path))
             except Exception:
                 pass
-        self.root.geometry("1480x630")
-        self.root.minsize(1480, 650)
+        self.root.geometry("1480x730")
+        self.root.minsize(1480, 750)
         self.root.configure(bg="#ffffff")
         self.detector = YOLODetector()
-        self.cap, self.is_running = None, False
+        self.cap, self.running = None, False
         self.current_source, self.processing_thread = None, None
         self.selected_source = tk.StringVar(value="media_device")
         self.selected_model = tk.StringVar()
         self.custom_model_path = tk.StringVar()
         self.rtsp_url = tk.StringVar()
+        self.rtmp_url = tk.StringVar()
+        self.rtmp_enabled = tk.BooleanVar(value=False)
         self.conf_threshold = tk.DoubleVar(value=0.5)
         self.nms_threshold = tk.DoubleVar(value=0.4)
-        self.selected_media_device = tk.StringVar()
-        # GUI components
+        self.selected_device = tk.StringVar()
         self.source_manager = YOLOSource(self)
         self.detection_manager = YOLODetection(self)
         self.stats_panel = YOLOStatsPanel(self)
+        self.yolo_process = YOLOProcess(self)
         self.setup_gui()
         # After GUI setup, refresh media devices and models
         self.source_manager.refresh_media_devices()
         self.source_manager.refresh_models()
-        
+    # Setup main GUI layout
     def setup_gui(self):
         # Setup main GUI layout: left, center, right panels
         self.paned_window = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
@@ -575,38 +767,45 @@ class YOLOGui:
         self.right_frame.pack_propagate(True)
         self.paned_window.add(self.right_frame, weight=0)
         self.setup_right_panel(self.right_frame)
-
+    # Setup left panel components
     def setup_left_panel(self, parent):
         left_frame = ttk.LabelFrame(parent, text="Source Selection", padding=10)
         left_frame.pack(fill=tk.BOTH, expand=True, padx=(0, 2), pady=(0, 0))
         # Input source selection
         ttk.Label(left_frame, text="Input Source:", font=('Arial', 10, 'bold')).pack(anchor=tk.W, pady=(0, 5))
-        sources = ["Media Device", "RTSP Stream", "Video File", "Image File"]
-        values = ["media_device", "rtsp", "video", "image"]
-        self.source_radio_buttons = []
+        sources = ["Media Device", "RTSP Stream", "Video File", "Image File", "Folder"]
+        values = ["media_device", "rtsp", "video", "image", "folder"]
+        self.source_live_buttons = []
         for text, value in zip(sources, values):
-            rb = ttk.Radiobutton(left_frame, text=text, variable=self.selected_source,
-                                value=value, command=self.source_manager.on_source_change)
+            rb = ttk.Radiobutton(left_frame, text=text, variable=self.selected_source,value=value, command=self.source_manager.on_source_change)
             rb.pack(anchor=tk.W, pady=2)
-            self.source_radio_buttons.append(rb)
+            self.source_live_buttons.append(rb)
         self.source_frame = ttk.Frame(left_frame)
         self.source_frame.pack(fill=tk.X, pady=10)
         # RTSP input
         self.rtsp_frame = ttk.Frame(self.source_frame)
-        ttk.Label(self.rtsp_frame, text="RTSP URL:").pack(anchor=tk.W)
+        rtsp_row = ttk.Frame(self.rtsp_frame)
+        rtsp_row.pack(fill=tk.X)
+        ttk.Label(rtsp_row, text="RTSP URL:").pack(side=tk.LEFT, anchor=tk.W)
+        self.rtmp_check = ttk.Checkbutton(rtsp_row, text="RTMP", variable=self.rtmp_enabled, command=self.yolo_process.update_rtmp_url)
+        self.rtmp_check.pack(side=tk.RIGHT, anchor=tk.E, padx=(10, 0))
         ttk.Entry(self.rtsp_frame, textvariable=self.rtsp_url, width=30).pack(fill=tk.X, pady=3)
         # Media device input
         self.media_device_frame = ttk.Frame(self.source_frame)
         ttk.Label(self.media_device_frame, text="Select Media Device:").pack(anchor=tk.W)
         self.media_device_combo = ttk.Combobox(
-            self.media_device_frame, textvariable=self.selected_media_device,state="readonly")
+            self.media_device_frame, textvariable=self.selected_device,state="readonly")
         self.media_device_combo.pack(fill=tk.X, pady=3)
-        # File input (video/image)
+        # File input (video/image/folder)
         self.file_frame = ttk.Frame(self.source_frame)
-        for txt, cmd in [("Select Video File", self.source_manager.select_video_file), ("Select Image File", self.source_manager.select_image_file)]:
+        for txt, cmd in [
+            ("Select Video File", self.source_manager.select_video_file),
+            ("Select Image File", self.source_manager.select_image_file),
+            ("Select Folder", self.source_manager.select_folder)
+        ]:
             ttk.Button(self.file_frame, text=txt, command=cmd).pack(fill=tk.X)
-        self.selected_file_label = ttk.Label(self.file_frame, text="No file selected", foreground="blue")
-        self.selected_file_label.pack(fill=tk.X, pady=2)
+        self.file_label = ttk.Label(self.file_frame, text="No file selected", foreground="blue")
+        self.file_label.pack(fill=tk.X, pady=2)
         ttk.Separator(left_frame, orient='horizontal').pack(fill=tk.X)
         # Model selection
         ttk.Label(left_frame, text="Select Model:", font=('Arial', 10, 'bold')).pack(anchor=tk.W, pady=(0, 5))
@@ -646,27 +845,12 @@ class YOLOGui:
         self.stop_button.pack(fill=tk.X, pady=5)
         ttk.Button(left_frame, text="Clear source", command=self.clear_source).pack(fill=tk.X, pady=5)
         self.source_manager.on_source_change()
-    # Model selection
-    def model_select(self, event):
-        self.source_manager.model_select(event)
-    # load custom model
-    def load_custom_model(self):
-        self.source_manager.load_custom_model()  
-    # Update confidence threshold label
-    def update_conf(self, event=None):
-        percent = int(self.conf_threshold.get() * 100)
-        self.conf_label.config(text=f"{percent}%")
-    # Update NMS threshold label
-    def update_nms(self, event=None):
-        percent = int(self.nms_threshold.get() * 100)
-        self.nms_label.config(text=f"{percent}%")
     # Setup center panel with video display and status
     def setup_center_panel(self, parent):
-        center_frame = parent
-        self.source_display_frame = ttk.LabelFrame(center_frame, text="Source Display")  
+        self.source_display_frame = ttk.LabelFrame(parent, text="Source Display")  
         self.source_display_frame.pack(fill=tk.BOTH, expand=True)
-        self.source_display_label = ttk.Label(self.source_display_frame, text="Source: None", font=('Arial', 12, 'bold'))
-        self.source_display_label.pack(anchor=tk.NW, pady=(0, 10))
+        self.display_label = ttk.Label(self.source_display_frame, text="Source: None", font=('Arial', 12, 'bold'))
+        self.display_label.pack(anchor=tk.NW, pady=(0, 10))
         self.video_box_frame = ttk.Frame(self.source_display_frame)
         self.video_box_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         self.video_label = tk.Label(
@@ -674,7 +858,7 @@ class YOLOGui:
         )
         self.video_label.pack(fill=tk.BOTH, expand=True)
         # Bottom status/info frame: shows status, source path, and FPS
-        self.bottom_status_frame = ttk.Frame(center_frame)
+        self.bottom_status_frame = ttk.Frame(parent)
         self.bottom_status_frame.pack(fill=tk.X, pady=(10, 0))
         self.bottom_status_frame.columnconfigure(0, weight=1)
         self.bottom_status_frame.columnconfigure(1, weight=1)
@@ -682,8 +866,8 @@ class YOLOGui:
         # Status labels
         self.status_label = ttk.Label(self.bottom_status_frame, text="Status: Ready")
         self.status_label.grid(row=0, column=0, sticky=tk.W)
-        self.source_path_label = ttk.Label(self.bottom_status_frame, text="Source Path: None")
-        self.source_path_label.grid(row=0, column=1)
+        self.path_label = ttk.Label(self.bottom_status_frame, text="Source Path: None")
+        self.path_label.grid(row=0, column=1)
         self.fps_label = ttk.Label(self.bottom_status_frame, text="FPS: 0")
         self.fps_label.grid(row=0, column=2, sticky=tk.E)
     # Setup right panel with detection results and statistics
@@ -694,12 +878,12 @@ class YOLOGui:
         stats_frame.pack(fill=tk.X, pady=(0, 10))
         self.model_label = ttk.Label(stats_frame, text="Model: None")
         self.model_label.pack(anchor=tk.W)
-        self.gpu_status_label = ttk.Label(stats_frame, text="Device: Unknown")
-        self.gpu_status_label.pack(anchor=tk.W)
-        self.session_time_label = ttk.Label(stats_frame, text="Session Time: 00:00:00")
-        self.session_time_label.pack(anchor=tk.W)
-        self.total_detections_label = ttk.Label(stats_frame, text="Total Detections: 0")
-        self.total_detections_label.pack(anchor=tk.W)
+        self.gpu_label = ttk.Label(stats_frame, text="Device: Unknown")
+        self.gpu_label.pack(anchor=tk.W)
+        self.session_label = ttk.Label(stats_frame, text="Session Time: 00:00:00")
+        self.session_label.pack(anchor=tk.W)
+        self.detections_label = ttk.Label(stats_frame, text="Total Detections: 0")
+        self.detections_label.pack(anchor=tk.W)
         export_frame = ttk.Frame(stats_frame)
         export_frame.pack(fill=tk.X, pady=5)
         # Buttons to save and clear stats
@@ -732,44 +916,65 @@ class YOLOGui:
             avg_conf = stats['avg_confidence']
             self.detection_tree.insert('', 'end', values=(class_name, current_count, total_count, f"{avg_conf:.2f}"))
         session_stats = self.detector.get_session_stats()
-        self.session_time_label.config(text=f"Session Time: {session_stats['sessionTime']}")
-        self.total_detections_label.config(text=f"Total Detections: {session_stats['totalDetections']}")
+        self.session_label.config(text=f"Session Time: {session_stats['sessionTime']}")
+        self.detections_label.config(text=f"Total Detections: {session_stats['totalDetections']}")
     # Clear source selection and reset display
     def clear_source(self):
         self.detection_manager.stop_detection()
         self.detector.reset_source()
         self.detection_display()
         self.selected_source.set("media_device")
-        self.selected_media_device.set("")
-        self.rtsp_url.set("")
+        self.selected_device.set("")
+        self.rtsp_url.set(""); self.rtmp_url.set("")
         self.current_source = None
-        self.selected_file_label.config(text="No file selected")
+        self.file_label.config(text="No file selected")
         self.source_manager.on_source_change()
-        self.source_display_label.config(text="Source: None")
-        self.source_path_label.config(text="Source Path: None")
-        self.clear_video_image()
-        self.enable_source_selection()
-        messagebox.showinfo("Success", "source selection reset")
+        self.display_label.config(text="Source: None")
+        self.path_label.config(text="Source Path: None")
+        self.clear_video_image(); self.enable_source()
+        self.rtmp_enabled.set(False)
+        if hasattr(self, 'mediamtx_proc') and self.mediamtx_proc:
+            try:
+                if sys.platform == 'win32':
+                    self.mediamtx_proc.send_signal(signal.CTRL_BREAK_EVENT)
+                else:
+                    self.mediamtx_proc.send_signal(signal.SIGINT)
+            except Exception:
+                pass
+            self.mediamtx_proc = None
+        messagebox.showinfo("Success", "source selection reset and RTMP stopped")
+    # Model selection
+    def model_select(self, event):
+        self.source_manager.model_select(event)
+    # load custom model
+    def load_custom_model(self):
+        self.source_manager.load_custom_model()  
+    # Update confidence threshold label
+    def update_conf(self, event=None):
+        percent = int(self.conf_threshold.get() * 100)
+        self.conf_label.config(text=f"{percent}%")
+    # Update NMS threshold label
+    def update_nms(self, event=None):
+        percent = int(self.nms_threshold.get() * 100)
+        self.nms_label.config(text=f"{percent}%")
+    # Disable source selection live buttons
+    def disable_source(self):
+        for rb in getattr(self, 'source_live_buttons', []):
+            rb.config(state=tk.DISABLED)
     # Clear video image
     def clear_video_image(self):
         self.video_label.config(image='', text="Video output will appear here", bg="#000000", fg="white")
         self.current_photo = None
-    # Disable source selection radio buttons
-    def disable_source_selection(self):
-        for rb in getattr(self, 'source_radio_buttons', []):
-            rb.config(state=tk.DISABLED)
-
-    # Enable source selection radio buttons
-    def enable_source_selection(self):
-        for rb in getattr(self, 'source_radio_buttons', []):
+    # Enable source selection live buttons
+    def enable_source(self):
+        for rb in getattr(self, 'source_live_buttons', []):
             rb.config(state=tk.NORMAL)
     # Start the Tkinter main loop
     def run(self):
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.root.mainloop()
-    # Handle window closing event
     def on_closing(self):
-        if self.detection_manager.is_running:
+        if self.detection_manager.running:
             self.detection_manager.stop_detection()
         self.root.destroy()
 # Run the GUI application

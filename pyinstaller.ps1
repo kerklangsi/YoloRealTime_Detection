@@ -3,8 +3,7 @@
 
 $pythonFiles   = Get-ChildItem -Filter *.py | Select-Object -First 1
 $iconFiles     = Get-ChildItem -Filter *.ico | Select-Object -First 1
-$include  = "include.txt"
-$exclude  = "exclude.txt"
+$requirements  = "requirements.txt"
 
 if (-not $pythonFiles) {
     Write-Host "ERROR: YoloRealTime_Detection.py not found in the current folder." -ForegroundColor Red
@@ -19,25 +18,15 @@ $script = $pythonFiles.Name
 $name   = [System.IO.Path]::GetFileNameWithoutExtension($script)
 $icon   = $iconFiles.FullName
 
-# Read hidden imports from include.txt
-if (Test-Path $include) {
-    $hiddenImports = Get-Content $include | Where-Object { $_ -and $_ -notmatch "^#" }
+# Read hidden imports from requirements.txt
+if (Test-Path $requirements) {
+    $hiddenImports = Get-Content $requirements | Where-Object { $_ -and $_ -notmatch "^#" }
 } else {
     $hiddenImports = @()
-    Write-Host "ERROR: $include not found. Please place it in the current folder." -ForegroundColor Red
+    Write-Host "ERROR: $requirements not found. Please place it in the current folder." -ForegroundColor Red
 }
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', 'hiddenImportArgs', Justification = 'variable is used in another scope')]
 $hiddenImportArgs = ($hiddenImports | ForEach-Object { "--hidden-import $_" }) -join " "
-
-# Read excluded modules from exclude.txt
-if (Test-Path $exclude) {
-    $excludedModules = Get-Content $exclude | Where-Object { $_ -and $_ -notmatch "^#" }
-} else {
-    $excludedModules = @()
-    Write-Host "WARNING: $exclude not found. No modules will be excluded." -ForegroundColor Yellow
-}
-[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', 'excludedModulesArgs', Justification = 'variable is used in another scope')]
-$excludedModulesArgs = ($excludedModules | ForEach-Object { "--exclude-module $_" }) -join " "
 
 # Build argument array for PyInstaller
 $pyinstallerArgs = @()
@@ -49,14 +38,7 @@ $pyinstallerArgs += "--icon=$icon"
 $pyinstallerArgs += "--contents-directory"
 $pyinstallerArgs += '"' + "bin" + '"'
 
-# Add excluded modules
-if ($excludedModules.Count -gt 0) {
-    foreach ($module in $excludedModules) {
-    $pyinstallerArgs += "--exclude-module"; $pyinstallerArgs += '"' + $module + '"'
-    }
-}
-
-# Automatically include all folders in the current directory (excluding files and hidden/system folders)
+# Automatically requirements all folders in the current directory (excluding files and hidden/system folders)
 $folders = Get-ChildItem -Directory | Where-Object { $_.Name -ne '.git' -and $_.Name -ne '__pycache__' }
 foreach ($folder in $folders) {
     $pyinstallerArgs += "--add-data"
@@ -69,14 +51,6 @@ if ($hiddenImports.Count -gt 0) {
     $pyinstallerArgs += "--hidden-import"; $pyinstallerArgs += '"' + $import + '"'
     }
 }
-
-# Add excluded module
-if ($excludedModules.Count -gt 0) {
-    foreach ($module in $excludedModules) {
-        $pyinstallerArgs += "--exclude-module"; $pyinstallerArgs += $module
-    }
-}
-$pyinstallerArgs += $script
 
 # Show the command and ask for confirmation
 $pyinstallerArgsString = $pyinstallerArgs -join ' '
