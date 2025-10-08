@@ -1,15 +1,13 @@
-import os,cv2,time,threading,sys,json,numpy as np,torch,socket,subprocess,signal
+import os,cv2,time,threading,sys,json,torch,socket,subprocess,signal
+import numpy as np
+import tkinter as tk
 from pathlib import Path
 from datetime import datetime
 from typing import Dict,List,Optional,Tuple
-import tkinter as tk
 from tkinter import ttk,filedialog,messagebox
 from PIL import Image,ImageTk
 from ultralytics import YOLO
-try:
-    from pygrabber.dshow_graph import FilterGraph
-except ImportError:
-    FilterGraph=None
+from pygrabber.dshow_graph import FilterGraph
 
 # Model Loading
 class YOLOModel:
@@ -26,7 +24,7 @@ class YOLOModel:
     # Load a YOLO model
     def load_model(self, model_path: str) -> bool:
         if not os.path.exists(model_path) or not model_path.endswith(".pt"):
-            print(f"Invalid model: {model_path}")
+            messagebox.showinfo("Invalid Model", f"Invalid model: {model_path}")
             return False
         try:
             self.model = YOLO(model_path)
@@ -40,7 +38,7 @@ class YOLOModel:
             self.class_names = list(self.model.names.values())
             return True
         except Exception as e:
-            print(f"Error loading model: {e}")
+            messagebox.showinfo("Error", f"Error loading model: {e}")
             return False
 
 # Statistics management class
@@ -130,7 +128,7 @@ class YOLOStats:
         }
         with open(filename, 'w') as f:
             json.dump(stats_data, f, indent=2)
-            print(f"Statistics saved to: {filename}")
+            messagebox.showinfo("Statistics Saved", f"Statistics saved to: {filename}")
         return filename
 
 # Streamlined detector class
@@ -156,7 +154,7 @@ class YOLODetector:
             annotated_frame, detections = self.process_results(frame, results[0], class_names)
             return annotated_frame, detections
         except Exception as e:
-            print(f"Error during detection: {e}")
+            messagebox.showinfo("Detection Error", f"Error during detection: {e}")
             return frame, []
     # Process detection results and annotate frame
     def process_results(self, frame: np.ndarray, result, class_names: List[str]) -> Tuple[np.ndarray, List[Dict]]:
@@ -179,12 +177,6 @@ class YOLODetector:
                 cv2.putText(annotated_frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
                 detections.append({'class': class_name,'confidence': float(conf), 'bbox': [int(x1), int(y1), int(x2), int(y2)]})
         return annotated_frame, detections
-    # Reset current detection counts
-    def reset_counts(self):
-        self.stats_manager.reset_counts()
-    # Reset statistics
-    def reset_source(self):
-        self.stats_manager.reset()
     # Get current detections
     def get_current_detections(self) -> List[Dict]:
         return self.stats_manager.get_current_detections()
@@ -466,7 +458,7 @@ class YOLODetection:
                 if frame is None:
                     messagebox.showerror("Error", f"Could not load image: {self.gui.current_source}")
                     return
-                self.gui.detector.reset_counts()
+                self.gui.detector.stats_manager.reset_counts()
                 annotated_frame, detections = self.gui.detector.objects(frame, self.gui.conf_threshold.get(), self.gui.nms_threshold.get())
                 self.gui.yolo_process.display_frame(annotated_frame)
                 self.gui.detection_display()
@@ -538,7 +530,7 @@ class YOLOProcess:
             if not ret:
                 break
             frame = cv2.resize(frame, (resize_width, resize_height))
-            self.gui.detector.reset_counts()
+            self.gui.detector.stats_manager.reset_counts()
             annotated_frame, detections = self.gui.detector.objects(frame, self.gui.conf_threshold.get(), self.gui.nms_threshold.get())
             self.gui.root.after(0, lambda f=annotated_frame: self.display_frame(f))
             self.gui.root.after(0, self.gui.detection_display)
@@ -613,7 +605,7 @@ class YOLOProcess:
             frame = cv2.imread(img_path)
             if frame is None:
                 continue
-            self.gui.detector.reset_counts()
+            self.gui.detector.stats_manager.reset_counts()
             annotated_frame, detections = self.gui.detector.objects(frame, self.gui.conf_threshold.get(), self.gui.nms_threshold.get())
             # Save result image with object classes drawn
             result_path = os.path.join(result_dir, img_name)
@@ -707,7 +699,7 @@ class YOLOStatsPanel:
             messagebox.showerror("Error", f"Error saving statistics: {e}")
     # Reset statistics
     def reset_statistics(self):
-        self.gui.detector.reset_source()
+        self.gui.detector.stats_manager.reset()
         self.gui.detection_display()
         messagebox.showinfo("Success", "Statistics have been cleared.")
 # Main GUI class
@@ -717,17 +709,14 @@ class YOLOGui:
         self.root = tk.Tk()
         self.root.title("YOLO Object Detection GUI")
         icon_path = Path(__file__).resolve().parent / "icon.ico"
-        if icon_path.exists():
-            try:
-                self.root.iconbitmap(str(icon_path))
-            except Exception:
-                pass
+        self.root.iconbitmap(str(icon_path))
         self.root.geometry("1480x730")
         self.root.minsize(1480, 750)
         self.root.configure(bg="#ffffff")
         self.detector = YOLODetector()
         self.cap, self.running = None, False
         self.current_source, self.processing_thread = None, None
+        # GUI variables
         self.selected_source = tk.StringVar(value="media_device")
         self.selected_model = tk.StringVar()
         self.custom_model_path = tk.StringVar()
@@ -813,8 +802,8 @@ class YOLOGui:
         ttk.Label(left_frame, text=f"{model_dir}", font=('Arial', 10)).pack(anchor=tk.W, pady=(0, 2))
         self.model_listbox = tk.Listbox(left_frame, height=5, exportselection=False)
         self.model_listbox.pack(fill=tk.X, pady=2)
-        self.model_listbox.bind('<<ListboxSelect>>', self.model_select)
-        ttk.Button(left_frame, text="Load Custom Model", command=self.load_custom_model).pack(fill=tk.X, pady=2)
+        self.model_listbox.bind('<<ListboxSelect>>', self.source_manager.model_select)
+        ttk.Button(left_frame, text="Load Custom Model", command=self.source_manager.load_custom_model).pack(fill=tk.X, pady=2)
         ttk.Label(left_frame, textvariable=self.custom_model_path, foreground="blue").pack(fill=tk.X, pady=2)
         ttk.Separator(left_frame, orient='horizontal').pack(fill=tk.X)
         # Detection settings
@@ -921,7 +910,7 @@ class YOLOGui:
     # Clear source selection and reset display
     def clear_source(self):
         self.detection_manager.stop_detection()
-        self.detector.reset_source()
+        self.detector.stats_manager.reset()
         self.detection_display()
         self.selected_source.set("media_device")
         self.selected_device.set("")
@@ -943,12 +932,6 @@ class YOLOGui:
                 pass
             self.mediamtx_proc = None
         messagebox.showinfo("Success", "source selection reset and RTMP stopped")
-    # Model selection
-    def model_select(self, event):
-        self.source_manager.model_select(event)
-    # load custom model
-    def load_custom_model(self):
-        self.source_manager.load_custom_model()  
     # Update confidence threshold label
     def update_conf(self, event=None):
         percent = int(self.conf_threshold.get() * 100)
@@ -978,5 +961,4 @@ class YOLOGui:
             self.detection_manager.stop_detection()
         self.root.destroy()
 # Run the GUI application
-if __name__ == "__main__":
-    YOLOGui().run()
+if __name__ == "__main__": YOLOGui().run()
