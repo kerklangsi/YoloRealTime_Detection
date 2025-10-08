@@ -24,7 +24,7 @@ class YOLOModel:
     # Load a YOLO model
     def load_model(self, model_path: str) -> bool:
         if not os.path.exists(model_path) or not model_path.endswith(".pt"):
-            messagebox.showinfo("Invalid Model", f"Invalid model: {model_path}")
+            print(f"Invalid model: {model_path}")
             return False
         try:
             self.model = YOLO(model_path)
@@ -38,7 +38,7 @@ class YOLOModel:
             self.class_names = list(self.model.names.values())
             return True
         except Exception as e:
-            messagebox.showinfo("Error", f"Error loading model: {e}")
+            print(f"Error loading model: {e}")
             return False
 
 # Statistics management class
@@ -128,7 +128,7 @@ class YOLOStats:
         }
         with open(filename, 'w') as f:
             json.dump(stats_data, f, indent=2)
-            messagebox.showinfo("Statistics Saved", f"Statistics saved to: {filename}")
+            print(f"Statistics saved to: {filename}")
         return filename
 
 # Streamlined detector class
@@ -154,7 +154,7 @@ class YOLODetector:
             annotated_frame, detections = self.process_results(frame, results[0], class_names)
             return annotated_frame, detections
         except Exception as e:
-            messagebox.showinfo("Detection Error", f"Error during detection: {e}")
+            print(f"Error during detection: {e}")
             return frame, []
     # Process detection results and annotate frame
     def process_results(self, frame: np.ndarray, result, class_names: List[str]) -> Tuple[np.ndarray, List[Dict]]:
@@ -177,6 +177,12 @@ class YOLODetector:
                 cv2.putText(annotated_frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
                 detections.append({'class': class_name,'confidence': float(conf), 'bbox': [int(x1), int(y1), int(x2), int(y2)]})
         return annotated_frame, detections
+    # Reset current detection counts
+    def reset_counts(self):
+        self.stats_manager.reset_counts()
+    # Reset statistics
+    def reset_source(self):
+        self.stats_manager.reset()
     # Get current detections
     def get_current_detections(self) -> List[Dict]:
         return self.stats_manager.get_current_detections()
@@ -198,11 +204,8 @@ class YOLOSource:
         if self.gui.selected_source.get() == "media_device":
             devices = []
             if sys.platform == 'win32' and FilterGraph is not None:
-                try:
-                    graph = FilterGraph()
-                    devices = graph.get_input_devices()
-                except Exception as e:
-                    print(f"Error getting media devices with pygrabber: {e}")
+                graph = FilterGraph()
+                devices = graph.get_input_devices()
             if not devices:
                 for i in range(5):
                     cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)
@@ -305,15 +308,12 @@ class YOLOSource:
             self.refresh_media_devices()
             selected = self.gui.selected_device.get()
             if selected and selected != "None":
-                try:
-                    idx = int(selected.split()[-1])
-                    cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
-                    ret, frame = cap.read()
-                    if ret and frame is not None:
-                        self.gui.display_frame(frame)
-                    cap.release()
-                except Exception:
-                    pass
+                idx = int(selected.split()[-1])
+                cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
+                ret, frame = cap.read()
+                if ret and frame is not None:
+                    self.gui.display_frame(frame)
+                cap.release()
     # Handle model selection
     def model_select(self, event):
         selection = self.gui.model_listbox.curselection()
@@ -458,7 +458,7 @@ class YOLODetection:
                 if frame is None:
                     messagebox.showerror("Error", f"Could not load image: {self.gui.current_source}")
                     return
-                self.gui.detector.stats_manager.reset_counts()
+                self.gui.detector.reset_counts()
                 annotated_frame, detections = self.gui.detector.objects(frame, self.gui.conf_threshold.get(), self.gui.nms_threshold.get())
                 self.gui.yolo_process.display_frame(annotated_frame)
                 self.gui.detection_display()
@@ -495,10 +495,7 @@ class YOLODetection:
             return
         self.running = False
         if self.cap:
-            try:
-                self.cap.release()
-            except Exception:
-                pass
+            self.cap.release()
             self.cap = None
         self.gui.start_button.config(state=tk.NORMAL)
         self.gui.stop_button.config(state=tk.DISABLED)
@@ -530,7 +527,7 @@ class YOLOProcess:
             if not ret:
                 break
             frame = cv2.resize(frame, (resize_width, resize_height))
-            self.gui.detector.stats_manager.reset_counts()
+            self.gui.detector.reset_counts()
             annotated_frame, detections = self.gui.detector.objects(frame, self.gui.conf_threshold.get(), self.gui.nms_threshold.get())
             self.gui.root.after(0, lambda f=annotated_frame: self.display_frame(f))
             self.gui.root.after(0, self.gui.detection_display)
@@ -605,7 +602,7 @@ class YOLOProcess:
             frame = cv2.imread(img_path)
             if frame is None:
                 continue
-            self.gui.detector.stats_manager.reset_counts()
+            self.gui.detector.reset_counts()
             annotated_frame, detections = self.gui.detector.objects(frame, self.gui.conf_threshold.get(), self.gui.nms_threshold.get())
             # Save result image with object classes drawn
             result_path = os.path.join(result_dir, img_name)
@@ -617,10 +614,9 @@ class YOLOProcess:
             percent_text = f"{percent}%"
             count_text = f"{idx+1}/{total}"
             font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = 1.0
-            thickness = 2
+            font_scale, thickness = 1.0, 2
             # Percentage (top left)
-            pt_x, pt_y = 20, 50
+            pt_x, pt_y = 10, 50
             text_size, _ = cv2.getTextSize(percent_text, font, font_scale, thickness)
             bg_rect = (pt_x-5, pt_y-text_size[1]-5, pt_x+text_size[0]+5, pt_y+10)
             cv2.rectangle(preview_frame, (bg_rect[0], bg_rect[1]), (bg_rect[2], bg_rect[3]), (0,0,0), -1)
@@ -628,8 +624,7 @@ class YOLOProcess:
             # Count (top right)
             img_w = preview_frame.shape[1]
             text_size2, _ = cv2.getTextSize(count_text, font, font_scale, thickness)
-            ct_x = img_w - text_size2[0] - 20
-            ct_y = 50
+            ct_x, ct_y = img_w - text_size2[0] - 10, 50
             bg_rect2 = (ct_x-5, ct_y-text_size2[1]-5, ct_x+text_size2[0]+5, ct_y+10)
             cv2.rectangle(preview_frame, (bg_rect2[0], bg_rect2[1]), (bg_rect2[2], bg_rect2[3]), (0, 0, 0), -1)
             cv2.putText(preview_frame, count_text, (ct_x, ct_y), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
@@ -671,13 +666,10 @@ class YOLOProcess:
             # RTMP disabled: stop mediamtx and clear RTSP URL
             self.gui.rtsp_url.set("")
             if hasattr(self.gui, 'mediamtx_proc') and self.gui.mediamtx_proc:
-                try:
-                    if sys.platform == 'win32':
-                        self.gui.mediamtx_proc.send_signal(signal.CTRL_BREAK_EVENT)
-                    else:
-                        self.gui.mediamtx_proc.send_signal(signal.SIGINT)
-                except Exception:
-                    pass
+                if sys.platform == 'win32':
+                    self.gui.mediamtx_proc.send_signal(signal.CTRL_BREAK_EVENT)
+                else:
+                    self.gui.mediamtx_proc.send_signal(signal.SIGINT)
                 self.gui.mediamtx_proc = None
             messagebox.showinfo("Success", "RTMP stopped")
 # GUI statistics panel class
@@ -699,7 +691,7 @@ class YOLOStatsPanel:
             messagebox.showerror("Error", f"Error saving statistics: {e}")
     # Reset statistics
     def reset_statistics(self):
-        self.gui.detector.stats_manager.reset()
+        self.gui.detector.reset_source()
         self.gui.detection_display()
         messagebox.showinfo("Success", "Statistics have been cleared.")
 # Main GUI class
@@ -713,10 +705,10 @@ class YOLOGui:
         self.root.geometry("1480x730")
         self.root.minsize(1480, 750)
         self.root.configure(bg="#ffffff")
-        self.detector = YOLODetector()
         self.cap, self.running = None, False
         self.current_source, self.processing_thread = None, None
-        # GUI variables
+        # Initialize detector and GUI components
+        self.detector = YOLODetector()
         self.selected_source = tk.StringVar(value="media_device")
         self.selected_model = tk.StringVar()
         self.custom_model_path = tk.StringVar()
@@ -802,8 +794,8 @@ class YOLOGui:
         ttk.Label(left_frame, text=f"{model_dir}", font=('Arial', 10)).pack(anchor=tk.W, pady=(0, 2))
         self.model_listbox = tk.Listbox(left_frame, height=5, exportselection=False)
         self.model_listbox.pack(fill=tk.X, pady=2)
-        self.model_listbox.bind('<<ListboxSelect>>', self.source_manager.model_select)
-        ttk.Button(left_frame, text="Load Custom Model", command=self.source_manager.load_custom_model).pack(fill=tk.X, pady=2)
+        self.model_listbox.bind('<<ListboxSelect>>', self.model_select)
+        ttk.Button(left_frame, text="Load Custom Model", command=self.load_custom_model).pack(fill=tk.X, pady=2)
         ttk.Label(left_frame, textvariable=self.custom_model_path, foreground="blue").pack(fill=tk.X, pady=2)
         ttk.Separator(left_frame, orient='horizontal').pack(fill=tk.X)
         # Detection settings
@@ -910,7 +902,7 @@ class YOLOGui:
     # Clear source selection and reset display
     def clear_source(self):
         self.detection_manager.stop_detection()
-        self.detector.stats_manager.reset()
+        self.detector.reset_source()
         self.detection_display()
         self.selected_source.set("media_device")
         self.selected_device.set("")
@@ -923,15 +915,17 @@ class YOLOGui:
         self.clear_video_image(); self.enable_source()
         self.rtmp_enabled.set(False)
         if hasattr(self, 'mediamtx_proc') and self.mediamtx_proc:
-            try:
-                if sys.platform == 'win32':
-                    self.mediamtx_proc.send_signal(signal.CTRL_BREAK_EVENT)
-                else:
-                    self.mediamtx_proc.send_signal(signal.SIGINT)
-            except Exception:
-                pass
+            if sys.platform == 'win32':
+                self.mediamtx_proc.send_signal(signal.CTRL_BREAK_EVENT)
+            else:
+                self.mediamtx_proc.send_signal(signal.SIGINT)
             self.mediamtx_proc = None
-        messagebox.showinfo("Success", "source selection reset and RTMP stopped")
+    # Model selection
+    def model_select(self, event):
+        self.source_manager.model_select(event)
+    # load custom model
+    def load_custom_model(self):
+        self.source_manager.load_custom_model()  
     # Update confidence threshold label
     def update_conf(self, event=None):
         percent = int(self.conf_threshold.get() * 100)
@@ -961,4 +955,5 @@ class YOLOGui:
             self.detection_manager.stop_detection()
         self.root.destroy()
 # Run the GUI application
-if __name__ == "__main__": YOLOGui().run()
+if __name__ == "__main__":
+    YOLOGui().run()
