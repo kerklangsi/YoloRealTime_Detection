@@ -1,0 +1,121 @@
+{
+ "version": "auto-py-to-exe-configuration_v1",
+ "pyinstallerOptions": [
+  {
+   "optionDest": "noconfirm",
+   "value": true
+  },
+  {
+   "optionDest": "filenames",
+   "value": "G:/My Drive/Github/YoloRealTime_Detection/YoloRealTime_Detection.py"
+  },
+  {
+   "optionDest": "onefile",
+   "value": false
+  },
+  {
+   "optionDest": "console",
+   "value": false
+  },
+  {
+   "optionDest": "icon_file",
+   "value": "G:/My Drive/Github/YoloRealTime_Detection/icon.ico"
+  },
+  {
+   "optionDest": "name",
+   "value": "YoloRealTime_Detection"
+  },
+  {
+   "optionDest": "contents_directory",
+   "value": "."
+  },
+  {
+   "optionDest": "clean_build",
+   "value": true
+  },
+  {
+   "optionDest": "strip",
+   "value": false
+  },
+  {
+   "optionDest": "noupx",
+   "value": false
+  },
+  {
+   "optionDest": "disable_windowed_traceback",
+   "value": false
+  },
+  {
+   "optionDest": "uac_admin",
+   "value": false
+  },
+  {
+   "optionDest": "uac_uiaccess",
+   "value": false
+  },
+  {
+   "optionDest": "argv_emulation",
+   "value": false
+  },
+  {
+   "optionDest": "bootloader_ignore_signals",
+   "value": false
+  },
+  {
+   "optionDest": "datas",
+   "value": "G:/My Drive/Github/YoloRealTime_Detection/mediamtx;mediamtx/"
+  },
+  {
+   "optionDest": "datas",
+   "value": "G:/My Drive/Github/YoloRealTime_Detection/model;model/"
+  },
+  {
+   "optionDest": "datas",
+   "value": "G:/My Drive/Github/YoloRealTime_Detection/photo;photo/"
+  },
+  {
+   "optionDest": "datas",
+   "value": "G:/My Drive/Github/YoloRealTime_Detection/save;save/"
+  },
+  {
+   "optionDest": "hiddenimports",
+   "value": "numpy"
+  },
+  {
+   "optionDest": "hiddenimports",
+   "value": "torch"
+  },
+  {
+   "optionDest": "hiddenimports",
+   "value": "cv2"
+  },
+  {
+   "optionDest": "hiddenimports",
+   "value": "ultralytics"
+  },
+  {
+   "optionDest": "hiddenimports",
+   "value": "PIL"
+  },
+  {
+   "optionDest": "hiddenimports",
+   "value": "pygrabber"
+  },
+  {
+   "optionDest": "hiddenimports",
+   "value": "tzdata"
+  },
+  {
+   "optionDest": "datas",
+   "value": "G:/My Drive/Github/YoloRealTime_Detection/icon.ico;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "G:/My Drive/Github/YoloRealTime_Detection/requirements.txt;."
+  }
+ ],
+ "nonPyinstallerOptions": {
+  "increaseRecursionLimit": false,
+  "manualArguments": ""
+ }
+}

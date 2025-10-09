@@ -6,7 +6,7 @@ $iconFiles     = Get-ChildItem -Filter *.ico | Select-Object -First 1
 $requirements  = "requirements.txt"
 
 if (-not $pythonFiles) {
-    Write-Host "ERROR: YoloRealTime_Detection.py not found in the current folder." -ForegroundColor Red
+    Write-Host "ERROR: python.py not found in the current folder." -ForegroundColor Red
     exit 1
 }
 if (-not $iconFiles) {
@@ -39,11 +39,11 @@ $pyinstallerArgs += "--contents-directory"
 $pyinstallerArgs += '"' + "bin" + '"'
 
 # Automatically requirements all folders in the current directory (excluding files and hidden/system folders)
-$folders = Get-ChildItem -Directory | Where-Object { $_.Name -ne '.git' -and $_.Name -ne '__pycache__' }
-foreach ($folder in $folders) {
-    $pyinstallerArgs += "--add-data"
-    $pyinstallerArgs += '"' + "$($folder.Name);." + '"'
-}
+# $folders = Get-ChildItem -Directory | Where-Object { $_.Name -ne '.git' -and $_.Name -ne '__pycache__' }
+# foreach ($folder in $folders) {
+#     $pyinstallerArgs += "--add-data"
+#     $pyinstallerArgs += '"' + "$($folder.Name);." + '"'
+# }
 
 # Add hidden imports
 if ($hiddenImports.Count -gt 0) {
@@ -53,9 +53,10 @@ if ($hiddenImports.Count -gt 0) {
 }
 
 # Show the command and ask for confirmation
+
 $pyinstallerArgsString = $pyinstallerArgs -join ' '
 Write-Host "PyInstaller will run with the following command:" -ForegroundColor Yellow
-Write-Host "pyinstaller $pyinstallerArgsString" -ForegroundColor Cyan
+Write-Host "pyinstaller $pyinstallerArgsString $script" -ForegroundColor Cyan
 
 # Confirm with the user
 $confirm = Read-Host "Do you want to continue? (Y/N)"
@@ -66,9 +67,13 @@ if ($confirm -ne 'Y' -and $confirm -ne 'y') {
 
 # Run PyInstaller
 Write-Host "Building..." -ForegroundColor Green
-pyinstaller @pyinstallerArgs
-Write-Host "Copying icon to output folder..." -ForegroundColor Green
+pyinstaller @pyinstallerArgs $script
 $outputDir = Join-Path -Path "dist" -ChildPath $name
-Copy-Item -Path $icon -Destination $outputDir -Force
+if (Test-Path $outputDir) {
+    Write-Host "Copying icon to output folder..." -ForegroundColor Green
+    Copy-Item -Path $icon -Destination $outputDir -Force
+} else {
+    Write-Host "ERROR: Output directory '$outputDir' not found. PyInstaller may have failed." -ForegroundColor Red
+}
 Write-Host "Build finished." -ForegroundColor Green
 Pause

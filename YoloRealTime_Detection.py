@@ -7,7 +7,10 @@ from typing import Dict,List,Optional,Tuple
 from tkinter import ttk,filedialog,messagebox
 from PIL import Image,ImageTk
 from ultralytics import YOLO
-from pygrabber.dshow_graph import FilterGraph
+try:
+    from pygrabber.dshow_graph import FilterGraph
+except ImportError:
+    FilterGraph = None
 
 # Model Loading
 class YOLOModel:
@@ -700,21 +703,18 @@ class YOLOStatsPanel:
         detections = self.gui.detector.get_current_detections()
         if frame is None or not detections:
             return
-        save_dir = Path(__file__).resolve().parent / "save"
+        save_dir = Path(__file__).resolve().parent / "photo"
         save_dir.mkdir(exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         filename = str(save_dir / f"{timestamp}.png")
-        try:
-            pil_image = None
-            if hasattr(frame, 'image'):
-                pil_image = frame.image
-            elif hasattr(frame, '_PhotoImage__photo'):
-                frame._PhotoImage__photo.write(filename, format="png")
-                return
-            if pil_image:
-                pil_image.save(filename)
-        except Exception:
-            pass
+        pil_image = None
+        if hasattr(frame, 'image'):
+            pil_image = frame.image
+        elif hasattr(frame, '_PhotoImage__photo'):
+            frame._PhotoImage__photo.write(filename, format="png")
+            return
+        if pil_image:
+            pil_image.save(filename)
 # Main GUI class
 class YOLOGui:
     def __init__(self):
@@ -892,8 +892,8 @@ class YOLOGui:
         ttk.Button(export_frame, text="Save Stats", command=self.stats_panel.save_statistics).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(export_frame, text="Clear Stats", command=self.stats_panel.reset_statistics).pack(side=tk.LEFT)
         self.save_var = tk.BooleanVar(value=False)
-        self.auto_save_checkbox = ttk.Checkbutton(export_frame, text="Save Frame", variable=self.save_var)
-        self.auto_save_checkbox.pack(side=tk.LEFT, padx=(5, 0))
+        self.auto_checkbox = ttk.Checkbutton(export_frame, text="Save Frame", variable=self.save_var)
+        self.auto_checkbox.pack(side=tk.LEFT, padx=(5, 0))
         ttk.Label(right_frame, text="Object Classes:", font=('Arial', 10, 'bold')).pack(anchor=tk.W, pady=(0, 5))
         list_frame = ttk.Frame(right_frame)
         list_frame.pack(fill=tk.BOTH, expand=True)
@@ -915,12 +915,12 @@ class YOLOGui:
         for item in self.detection_tree.get_children():
             self.detection_tree.delete(item)
         detections = self.detector.get_current_detections()
-        # Auto-save logic: only save if current_count increases
-        if not hasattr(self, '_last_current_count'):
-            self._last_current_count = 0
-        # Find the main detection class (e.g., Hotspot)
+        # Auto-save logic
+        if not hasattr(self, 'last_count'):
+            self.last_count = 0
+        # Find the main detection class
         main_class = None
-        main_current_count = 0
+        main_count = 0
         for class_name, stats in self.detector.stats_manager.detection_stats.items():
             current_count = stats['current_count']
             total_count = stats['total_count']
@@ -929,19 +929,18 @@ class YOLOGui:
             # Use the first class as main (or customize as needed)
             if main_class is None:
                 main_class = class_name
-                main_current_count = current_count
-        # Only save frame if auto-save is enabled, current_count > 0, and current_count increased
+                main_count = current_count
+        # Only save frame if auto-save is enabled
         if not hasattr(self, 'last_save'):
             self.last_save = 0
         if hasattr(self, 'save_var') and self.save_var.get():
-            # Debounce: only save if increase is stable for 1.0s
+            # Debounce: only save if increase is stable for 2.0s
             now = time.time()
-            if main_current_count > 0 and main_current_count > self._last_current_count:
-                # Wait for stability
-                if now - getattr(self, 'last_save', 0) > 1.0:
+            if main_count > 0 and main_count > self.last_count:
+                if now - getattr(self, 'last_save', 0) > 2.0:
                     self.stats_panel.save_frame()
                     self.last_save = now
-        self._last_current_count = main_current_count
+        self.last_count = main_count
         session_stats = self.detector.get_session_stats()
         self.session_label.config(text=f"Session Time: {session_stats['sessionTime']}")
         self.detections_label.config(text=f"Total Detections: {session_stats['totalDetections']}")
@@ -1001,5 +1000,4 @@ class YOLOGui:
             self.detection_manager.stop_detection()
         self.root.destroy()
 # Run the GUI application
-if __name__ == "__main__":
-    YOLOGui().run()
+if __name__ == "__main__":   YOLOGui().run()

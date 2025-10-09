@@ -1,7 +1,6 @@
 numpy
-torch
+torch torchvision --index-url https://download.pytorch.org/whl/cu129
 opencv-python
 ultralytics
 Pillow
 pygrabber
-tkinter
