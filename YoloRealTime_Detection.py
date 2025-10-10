@@ -465,7 +465,14 @@ class YOLODetection:
                 annotated_frame, detections = self.gui.detector.objects(frame, self.gui.conf_threshold.get(), self.gui.nms_threshold.get())
                 self.gui.yolo_process.display_frame(annotated_frame)
                 self.gui.detection_display()
-                messagebox.showinfo("Success", f"Processed image with {len(detections)} detections")
+                # Save annotated result in photo/<image_name>
+                image_path = Path(self.gui.current_source)
+                image_name = image_path.name
+                photo_dir = Path(__file__).resolve().parent / "photo"
+                photo_dir.mkdir(parents=True, exist_ok=True)
+                result_path = photo_dir / image_name
+                cv2.imwrite(str(result_path), annotated_frame)
+                messagebox.showinfo("Success", f"Processed image with {len(detections)} detections.")
             # Image folder
             elif source_type == "folder":
                 folder = self.gui.current_source
@@ -598,6 +605,10 @@ class YOLOProcess:
     def process_folder(self, images, folder, result_dir, total):
         processed_count = 0
         self.gui.detection_manager.running = True
+        photo_dir = Path(__file__).resolve().parent / "photo"
+        folder_name = os.path.basename(folder)
+        result_dir = photo_dir / folder_name
+        result_dir.mkdir(parents=True, exist_ok=True)
         for idx, img_name in enumerate(images):
             if not self.gui.detection_manager.running:
                 break
@@ -608,7 +619,7 @@ class YOLOProcess:
             self.gui.detector.reset_counts()
             annotated_frame, detections = self.gui.detector.objects(frame, self.gui.conf_threshold.get(), self.gui.nms_threshold.get())
             # Save result image with object classes drawn
-            result_path = os.path.join(result_dir, img_name)
+            result_path = str(result_dir / img_name)
             cv2.imwrite(result_path, annotated_frame)
             processed_count += 1
             # Overlay percentage and annotation count for GUI preview only
@@ -663,6 +674,7 @@ class YOLOProcess:
                         creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
                     self.gui.mediamtx_proc = subprocess.Popen(
                         f'"{mediamtx_path}"', shell=True, cwd=mediamtx_dir, creationflags=creationflags)
+                    messagebox.showinfo("Success", f"rtmp address set at {rtsp_url}")
                 except Exception as e:
                     messagebox.showerror("mediamtx Error", f"Could not start mediamtx: {e}")
         else:
@@ -670,10 +682,10 @@ class YOLOProcess:
             self.gui.rtsp_url.set("")
             if hasattr(self.gui, 'mediamtx_proc') and self.gui.mediamtx_proc:
                 if sys.platform == 'win32':
-                    self.gui.mediamtx_proc.send_signal(signal.CTRL_BREAK_EVENT)
-                else:
-                    self.gui.mediamtx_proc.send_signal(signal.SIGINT)
-                self.gui.mediamtx_proc = None
+                    subprocess.run(["taskkill", "/F", "/IM", "mediamtx.exe"],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
+                    )
+            self.gui.mediamtx_proc = None
             messagebox.showinfo("Success", "RTMP stopped")
 # GUI statistics panel class
 class YOLOStatsPanel:
@@ -715,6 +727,21 @@ class YOLOStatsPanel:
             return
         if pil_image:
             pil_image.save(filename)
+    # Open save folder in file explorer
+    def open_save_folder(self):
+        save_folder = Path(__file__).resolve().parent / "save"
+        save_folder.mkdir(exist_ok=True)
+        subprocess.Popen(f'explorer "{save_folder}"')
+    # Open results folder in file explorer
+    def open_photo_folder(self):
+        photo_folder = Path(__file__).resolve().parent / "photo"
+        photo_folder.mkdir(exist_ok=True)
+        subprocess.Popen(f'explorer "{photo_folder}"')
+    # Open model folder in file explorer
+    def open_model_folder(self):
+        model_folder = Path(__file__).resolve().parent / "model"
+        model_folder.mkdir(exist_ok=True)
+        subprocess.Popen(f'explorer "{model_folder}"')
 # Main GUI class
 class YOLOGui:
     def __init__(self):
@@ -894,6 +921,11 @@ class YOLOGui:
         self.save_var = tk.BooleanVar(value=False)
         self.auto_checkbox = ttk.Checkbutton(export_frame, text="Save Frame", variable=self.save_var)
         self.auto_checkbox.pack(side=tk.LEFT, padx=(5, 0))
+        # Add buttons to open folders
+        ttk.Button(stats_frame, text="Open Save Stats Folder", command=self.stats_panel.open_save_folder).pack(fill=tk.X, pady=2)
+        ttk.Button(stats_frame, text="Open Results Folder", command=self.stats_panel.open_photo_folder).pack(fill=tk.X, pady=2)
+        ttk.Button(stats_frame, text="Open Model Folder", command=self.stats_panel.open_model_folder).pack(fill=tk.X, pady=2)
+        # Detection results
         ttk.Label(right_frame, text="Object Classes:", font=('Arial', 10, 'bold')).pack(anchor=tk.W, pady=(0, 5))
         list_frame = ttk.Frame(right_frame)
         list_frame.pack(fill=tk.BOTH, expand=True)
@@ -959,12 +991,13 @@ class YOLOGui:
         self.path_label.config(text="Source Path: None")
         self.clear_video_image(); self.enable_source()
         self.rtmp_enabled.set(False)
+        self.rtsp_url.set("")
         if hasattr(self, 'mediamtx_proc') and self.mediamtx_proc:
             if sys.platform == 'win32':
-                self.mediamtx_proc.send_signal(signal.CTRL_BREAK_EVENT)
-            else:
-                self.mediamtx_proc.send_signal(signal.SIGINT)
-            self.mediamtx_proc = None
+                subprocess.run(["taskkill", "/F", "/IM", "mediamtx.exe"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
+                )
+        self.mediamtx_proc = None
     # Model selection
     def model_select(self, event):
         self.source_manager.model_select(event)
@@ -998,6 +1031,11 @@ class YOLOGui:
     def on_closing(self):
         if self.detection_manager.running:
             self.detection_manager.stop_detection()
+        if hasattr(self, 'mediamtx_proc') and self.mediamtx_proc:
+            if sys.platform == 'win32':
+                subprocess.run(["taskkill", "/F", "/IM", "mediamtx.exe"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
+                )
         self.root.destroy()
 # Run the GUI application
 if __name__ == "__main__":   YOLOGui().run()
