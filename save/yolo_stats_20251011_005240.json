@@ -1,0 +1,27 @@
+{
+  "session_info": {
+    "modelName": "example.pt",
+    "totalDetections": 1,
+    "sessionTime": "0:00:18",
+    "classStats": {
+      "Hotspot": 1
+    }
+  },
+  "detailed_stats": {
+    "Hotspot": {
+      "total_count": 1,
+      "current_count": 1,
+      "avg_confidence": 0.6002947688102722,
+      "confidence_sum": 0.6002947688102722,
+      "last_bboxes": [
+        [
+          293,
+          424,
+          403,
+          456
+        ]
+      ]
+    }
+  },
+  "export_time": "2025-10-11T00:52:40.430067"
+}
