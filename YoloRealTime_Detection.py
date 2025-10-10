@@ -701,7 +701,7 @@ class YOLOStatsPanel:
     def save_statistics(self):
         try:
             filename = self.gui.detector.save_statistics()
-            messagebox.showinfo("Success", f"Statistics saved to: {filename}")
+            messagebox.showinfo("Success", f"Statistics saved to save stats folder")
         except Exception as e:
             messagebox.showerror("Error", f"Error saving statistics: {e}")
     # Reset statistics
