@@ -83,9 +83,11 @@ Each feature is self-contained and guides you with prompts specific to its task.
 
 ### 🖼 Example GUI Usage
 
-![Example 1](https://github.com/kerklangsi/YoloRealTime_Detection/blob/01c07f3c22b7eb947dd3135b2e56dfdd4b57eb23/example/example.png)
-
-![Example 2](https://github.com/kerklangsi/YoloRealTime_Detection/blob/01c07f3c22b7eb947dd3135b2e56dfdd4b57eb23/example/example/example_1.png)
+<div align="center">
+  <img src="https://github.com/kerklangsi/YoloRealTime_Detection/blob/01c07f3c22b7eb947dd3135b2e56dfdd4b57eb23/example/example.png" alt="Example 1" />
+  <br>
+  <img src="https://github.com/kerklangsi/YoloRealTime_Detection/blob/01c07f3c22b7eb947dd3135b2e56dfdd4b57eb23/example/example/example_1.png" alt="Example 2" />
+</div>
 
 ## 🙌 Credits
 
