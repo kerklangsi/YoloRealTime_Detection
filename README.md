@@ -29,7 +29,7 @@ pip install -r requirements.txt
 - Interactive GUI (Tkinter)
 - Displays detection results, statistics, and session info
 - Export detection statistics to JSON
-- GPU/CPU device selection (automatic) nvidia only
+- GPU/CPU device selection (automatic) nvidia 
 - Model selection and custom model loading
 
 ---
@@ -80,6 +80,12 @@ pip install -r requirements.txt
 Each feature is self-contained and guides you with prompts specific to its task.
 
 ---
+
+### 🖼 Example GUI Usage
+
+![Example 1](https://github.com/kerklangsi/YoloRealTime_Detection/blob/01c07f3c22b7eb947dd3135b2e56dfdd4b57eb23/example/example.png)
+
+![Example 2](https://github.com/kerklangsi/YoloRealTime_Detection/blob/01c07f3c22b7eb947dd3135b2e56dfdd4b57eb23/example/example/example_1.png)
 
 ## 🙌 Credits
 
