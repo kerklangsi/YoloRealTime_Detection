@@ -14,6 +14,7 @@ This project would not have been possible without the work of open-source develo
 * **[Pillow](https://python-pillow.org/)** – image processing library
 * **[pygrabber](https://pypi.org/project/pygrabber/)** – webcam capture for Python
 * **[Tkinter](https://docs.python.org/3/library/tkinter.html)** – Python GUI library
+* **[mediamtx](https://github.com/mediamtx/mediamtx)** – media server for RTMP support
 
 ## 💡 Assistance
 
