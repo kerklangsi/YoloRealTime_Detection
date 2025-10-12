@@ -87,30 +87,41 @@ Each feature is self-contained and guides you with prompts specific to its task.
 
 Below are example screenshots and sample outputs from the YOLO Real-Time Detection GUI. Each image shows a different feature or input source:
 
-- **Example 1:** Default GUI layout
-  [View](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_1.png?raw=true)
-- **Example 2:** Media Device (webcam/camera) detection
-  [View](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_2.png?raw=true)
-- **Example 3:** RTSP stream detection
-  [View](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_3.png?raw=true)
-- **Example 4:** Video file detection
-  [View](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_4.png?raw=true)
-- **Example 5:** Image file detection
-  [View](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_5.png?raw=true)
-- **Example 6:** Folder batch image detection
-  [View](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_6.png?raw=true)
-- **Example 7:** Additional folder batch image detection
-  [View](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_6.png?raw=true)
-- **Example 8:** More folder batch image detection
-  [View](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_6.png?raw=true)
-- **Example 9:** Annotated image result (from folder/image)
-  [View](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/Image/CCTV%20video_0004.png?raw=true)
-- **Example 10:** Annotated image result (from photo folder)
-  [View](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/photo/Image/CCTV%20video_0004.png?raw=true)
-- **Example 11:** Example video file (CCTV video)
-  [View](https://raw.githubusercontent.com/kerklangsi/YoloRealTime_Detection/refs/heads/main/example/Video/CCTV%20video.mp4?raw=true)
-- **Example 12:** Example video file (CCTV video)
-  [View](https://raw.githubusercontent.com/kerklangsi/YoloRealTime_Detection/refs/heads/main/example/Video/CCTV%20video.mp4?raw=true)
+**Example 1: Default GUI layout**
+![Default GUI](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_1.png?raw=true)
+
+**Example 2: Media Device (webcam/camera) detection**
+![Media Device](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_2.png?raw=true)
+
+**Example 3: RTSP/RTMP stream detection**
+![RTSP Stream](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_3.png?raw=true)
+
+**Example 4: Video file detection**
+![Video File](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_4.png?raw=true)
+
+**Example 5: Image file detection**
+![Image File](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_5.png?raw=true)
+
+**Example 6: Folder batch image detection**
+![Folder Batch](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_6.png?raw=true)
+
+**Example 7: Additional folder batch image detection**
+![Folder Batch 2](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_6.png?raw=true)
+
+**Example 8: More folder batch image detection**
+![Folder Batch 3](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_6.png?raw=true)
+
+**Example 9: Annotated image result (from folder/image)**
+![Annotated Image](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/Image/CCTV%20video_0004.png?raw=true)
+
+**Example 10: Annotated image result (from photo folder)**
+![Annotated Photo](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/photo/Image/CCTV%20video_0004.png?raw=true)
+
+**Example 11: Example video file (CCTV video)**
+[CCTV Video](https://raw.githubusercontent.com/kerklangsi/YoloRealTime_Detection/refs/heads/main/example/Video/CCTV%20video.mp4?raw=true)
+
+**Example 12: Example video file (CCTV video)**
+[CCTV Video](https://raw.githubusercontent.com/kerklangsi/YoloRealTime_Detection/refs/heads/main/example/Video/CCTV%20video.mp4?raw=true)
 
 ## 🙌 Credits
 
