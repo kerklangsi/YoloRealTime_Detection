@@ -74,8 +74,6 @@ pip install -r requirements.txt
 * The `stats` folder contains exported detection statistics (e.g., JSON files).
   - Use the "Open Stats Folder" button in the GUI, or manually open the `stats` folder to view or export statistics.
 
----
-
 Each feature is self-contained and guides you with prompts specific to its task.
 
 ---
