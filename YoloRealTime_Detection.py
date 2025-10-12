@@ -1,4 +1,4 @@
-import os,cv2,time,threading,sys,json,torch,socket,subprocess,signal
+import os,cv2,time,threading,sys,json,torch,socket,subprocess
 import numpy as np
 import tkinter as tk
 from pathlib import Path
@@ -394,7 +394,6 @@ class YOLODetection:
                     messagebox.showerror("Error", f"Could not resolve device index for: {selected}")
                     return
                 self.cap = cv2.VideoCapture(device_index, cv2.CAP_DSHOW)
-                
                 if not self.cap.isOpened():
                     messagebox.showerror("Error", f"Could not open video source: {selected}")
                     return
@@ -406,8 +405,6 @@ class YOLODetection:
                 self.gui.stop_button.config(state=tk.NORMAL)
                 self.gui.status_label.config(text="Status: Running")
                 source_text = self.gui.selected_device.get()
-                self.gui.display_label.config(text=f"Source: {source_text}")
-                self.gui.path_label.config(text=f"Source Path: {source_text}")
                 self.processing_thread = threading.Thread(target=self.gui.yolo_process.process_video, daemon=True)
                 self.processing_thread.start()
             # RTSP stream
@@ -416,8 +413,9 @@ class YOLODetection:
                 if not rtsp_url:
                     messagebox.showerror("Error", "Please enter RTSP URL")
                     return
-                self.cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
-                self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 2) 
+                rtsp_tcp = f"{rtsp_url}?rtsp_transport=tcp"
+                self.cap = cv2.VideoCapture(rtsp_tcp, cv2.CAP_FFMPEG)
+                self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'H264'))
                 if not self.cap.isOpened():
                     messagebox.showerror("Error", f"Could not open RTSP stream: {rtsp_url}")
                     return
@@ -428,8 +426,6 @@ class YOLODetection:
                 self.gui.start_button.config(state=tk.DISABLED)
                 self.gui.stop_button.config(state=tk.NORMAL)
                 self.gui.status_label.config(text="Status: Running")
-                self.gui.display_label.config(text=f"Source: {rtsp_url}")
-                self.gui.path_label.config(text=f"Source Path: {rtsp_url}")
                 self.processing_thread = threading.Thread(target=self.gui.yolo_process.process_video, daemon=True)
                 self.processing_thread.start()
             # Video file
@@ -448,8 +444,6 @@ class YOLODetection:
                 self.gui.start_button.config(state=tk.DISABLED)
                 self.gui.stop_button.config(state=tk.NORMAL)
                 self.gui.status_label.config(text="Status: Running")
-                self.gui.display_label.config(text=f"Source: {self.gui.current_source}")
-                self.gui.path_label.config(text=f"Source Path: {self.gui.current_source}")
                 self.processing_thread = threading.Thread(target=self.gui.yolo_process.process_video, daemon=True)
                 self.processing_thread.start()
             # Image file
@@ -483,8 +477,10 @@ class YOLODetection:
                 if not images:
                     messagebox.showerror("Error", "No images found in folder")
                     return
-                result_dir = os.path.join(folder, "result")
-                os.makedirs(result_dir, exist_ok=True)
+                photo_dir = Path(__file__).resolve().parent / "photo"
+                folder_name = os.path.basename(folder)
+                result_dir = photo_dir / folder_name
+                result_dir.mkdir(parents=True, exist_ok=True)
                 total = len(images)
                 processed_count = 0
                 self.gui.yolo_process.running = True
@@ -504,8 +500,12 @@ class YOLODetection:
         if not self.running:
             return
         self.running = False
+        # Release video capture safely
         if self.cap:
-            self.cap.release()
+            try:
+                self.cap.release()
+            except Exception as e:
+                pass
             self.cap = None
         self.gui.start_button.config(state=tk.NORMAL)
         self.gui.stop_button.config(state=tk.DISABLED)
@@ -523,7 +523,6 @@ class YOLOProcess:
     # Video processing loop
     def process_video(self):
         fps_counter, fps_start_time = 0, time.time()
-        resize_width, resize_height = 1024, 768
         if self.cap is not None:
             source_fps = self.cap.get(cv2.CAP_PROP_FPS)
             if not source_fps or source_fps <= 0 or source_fps > 120:
@@ -534,17 +533,18 @@ class YOLOProcess:
         while self.gui.detection_manager.running and self.cap and self.cap.isOpened():
             start_time = time.time()
             ret, frame = self.cap.read()
-            if not ret:
+            if not ret or frame is None:
                 break
-            frame = cv2.resize(frame, (resize_width, resize_height))
             self.gui.detector.reset_counts()
             annotated_frame, detections = self.gui.detector.objects(frame, self.gui.conf_threshold.get(), self.gui.nms_threshold.get())
             self.gui.root.after(0, lambda f=annotated_frame: self.display_frame(f))
             self.gui.root.after(0, self.gui.detection_display)
-            # Skip 2 frames
+            # Skip 2 frames safely
             for _ in range(2):
                 if self.cap.isOpened():
-                    self.cap.read()
+                    ret_skip, _ = self.cap.read()
+                    if not ret_skip:
+                        break
             fps_counter += 1
             if fps_counter % 30 == 0:
                 elapsed = time.time() - fps_start_time
@@ -560,43 +560,53 @@ class YOLOProcess:
     # Display frame in video label
     def display_frame(self, frame):
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        label_width = self.gui.video_label.winfo_width()
-        label_height = self.gui.video_label.winfo_height()
-        if label_width > 1 and label_height > 1:
-            h, w = frame_rgb.shape[:2]
-            aspect_ratio = w / h
-            max_height = label_height - 10
-            new_height = max_height
-            new_width = int(new_height * aspect_ratio)
-            source_type = self.gui.selected_source.get()
-            # Use source_type to determine correct label
-            if source_type == "rtsp":
-                # RTMP or RTSP
-                if hasattr(self.gui, 'rtmp_enabled') and self.gui.rtmp_enabled.get() and self.gui.rtmp_url.get():
-                    url = self.gui.rtmp_url.get().strip()
-                else:
-                    url = self.gui.rtsp_url.get().strip()
-                self.gui.display_label.config(text=f"Source: {url}")
-                self.gui.path_label.config(text=f"Source Path: {url}")
-            elif source_type == "video" or source_type == "image" or source_type == "folder":
-                if self.gui.current_source is not None:
-                    file_name = os.path.basename(self.gui.current_source)
-                    source_path = self.gui.current_source
-                else:
-                    file_name = "None"
-                    source_path = "None"
-                self.gui.display_label.config(text=f"Source: {file_name}")
-                self.gui.path_label.config(text=f"Source Path: {source_path}")
-            elif source_type == "media_device":
-                device = self.gui.selected_device.get()
-                self.gui.display_label.config(text=f"Source: {device}")
-                self.gui.path_label.config(text=f"Source Path: {device}")
-            else:
-                self.gui.display_label.config(text="Source: None")
-                self.gui.path_label.config(text="Source Path: None")
-            frame_resized = cv2.resize(frame_rgb, (new_width, new_height))
+        target_w = self.gui.video_label.winfo_width()
+        target_h = self.gui.video_label.winfo_height()
+        if target_w == 0 or target_h == 0:
+            return
+        h, w = frame_rgb.shape[:2]
+        src_aspect = w / h
+        disp_aspect = target_w / target_h
+        if src_aspect > disp_aspect:
+            new_w = target_w
+            new_h = int(target_w / src_aspect)
         else:
-            frame_resized = frame_rgb
+            new_h = target_h
+            new_w = int(target_h * src_aspect)
+        frame_scaled = cv2.resize(frame_rgb, (new_w, new_h), interpolation=cv2.INTER_AREA)
+        pad_left = (target_w - new_w) // 2
+        pad_right = target_w - new_w - pad_left
+        pad_top = (target_h - new_h) // 2
+        pad_bottom = target_h - new_h - pad_top
+        frame_resized = cv2.copyMakeBorder(
+            frame_scaled, pad_top, pad_bottom, pad_left, pad_right,
+            cv2.BORDER_CONSTANT, value=(0, 0, 0)
+        )
+        pil_image = Image.fromarray(frame_resized)
+        photo = ImageTk.PhotoImage(pil_image)
+        self.gui.video_label.configure(image=photo)
+        self.gui.current_photo = photo
+        # Update source display labels
+        source_type = self.gui.selected_source.get()
+        if source_type == "rtsp":
+            if hasattr(self.gui, 'rtmp_enabled') and self.gui.rtmp_enabled.get() and self.gui.rtmp_url.get():
+                url = self.gui.rtmp_url.get().strip()
+            else:
+                url = self.gui.rtsp_url.get().strip()
+            self.gui.display_label.config(text=f"Source: {url}")
+            self.gui.path_label.config(text=f"Source Path: {url}")
+        elif source_type in ("video", "image", "folder"):
+            file_name = os.path.basename(self.gui.current_source)
+            source_path = self.gui.current_source
+            self.gui.display_label.config(text=f"Source: {file_name}")
+            self.gui.path_label.config(text=f"Source Path: {source_path}")
+        elif source_type == "media_device":
+            device = self.gui.selected_device.get()
+            self.gui.display_label.config(text=f"Source: {device}")
+            self.gui.path_label.config(text=f"Source Path: {device}")
+        else:
+            self.gui.display_label.config(text="Source: None")
+            self.gui.path_label.config(text="Source Path: None")
         pil_image = Image.fromarray(frame_resized)
         photo = ImageTk.PhotoImage(pil_image)
         self.gui.video_label.configure(image=photo)
@@ -605,10 +615,6 @@ class YOLOProcess:
     def process_folder(self, images, folder, result_dir, total):
         processed_count = 0
         self.gui.detection_manager.running = True
-        photo_dir = Path(__file__).resolve().parent / "photo"
-        folder_name = os.path.basename(folder)
-        result_dir = photo_dir / folder_name
-        result_dir.mkdir(parents=True, exist_ok=True)
         for idx, img_name in enumerate(images):
             if not self.gui.detection_manager.running:
                 break
@@ -642,7 +648,6 @@ class YOLOProcess:
             bg_rect2 = (ct_x-5, ct_y-text_size2[1]-5, ct_x+text_size2[0]+5, ct_y+10)
             cv2.rectangle(preview_frame, (bg_rect2[0], bg_rect2[1]), (bg_rect2[2], bg_rect2[3]), (0, 0, 0), -1)
             cv2.putText(preview_frame, count_text, (ct_x, ct_y), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
-            # Preview in GUI
             self.display_frame(preview_frame)
             self.gui.root.update_idletasks()
         def show_result():
@@ -650,6 +655,7 @@ class YOLOProcess:
                 messagebox.showinfo("Success", f"Processed {processed_count} images. Results saved in result.")
             else:
                 messagebox.showinfo("Stopped", f"Stopped early. {processed_count} images processed and saved in result.")
+        self.gui.detection_manager.stop_detection()
         self.gui.root.after(0, show_result)
     # Update RTMP URL
     def update_rtmp_url(self):
@@ -682,9 +688,12 @@ class YOLOProcess:
             self.gui.rtsp_url.set("")
             if hasattr(self.gui, 'mediamtx_proc') and self.gui.mediamtx_proc:
                 if sys.platform == 'win32':
-                    subprocess.run(["taskkill", "/F", "/IM", "mediamtx.exe"],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
-                    )
+                    try:
+                        subprocess.run(["taskkill", "/F", "/IM", "mediamtx.exe"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
+                        )
+                    except subprocess.CalledProcessError:
+                        pass
             self.gui.mediamtx_proc = None
             messagebox.showinfo("Success", "RTMP stopped")
 # GUI statistics panel class
@@ -715,8 +724,14 @@ class YOLOStatsPanel:
         detections = self.gui.detector.get_current_detections()
         if frame is None or not detections:
             return
-        save_dir = Path(__file__).resolve().parent / "photo"
-        save_dir.mkdir(exist_ok=True)
+        source_name = None
+        if hasattr(self.gui, 'current_source') and self.gui.current_source:
+            source_path = Path(self.gui.current_source)
+            source_name = source_path.stem
+        else:
+            source_name = "auto"
+        save_dir = Path(__file__).resolve().parent / "photo" / source_name
+        save_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         filename = str(save_dir / f"{timestamp}.png")
         pil_image = None
@@ -876,19 +891,22 @@ class YOLOGui:
         self.source_manager.on_source_change()
     # Setup center panel with video display and status
     def setup_center_panel(self, parent):
-        self.source_display_frame = ttk.LabelFrame(parent, text="Source Display")  
-        self.source_display_frame.pack(fill=tk.BOTH, expand=True)
-        self.display_label = ttk.Label(self.source_display_frame, text="Source: None", font=('Arial', 12, 'bold'))
-        self.display_label.pack(anchor=tk.NW, pady=(0, 10))
-        self.video_box_frame = ttk.Frame(self.source_display_frame)
-        self.video_box_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        parent.grid_rowconfigure(0, weight=1)
+        parent.grid_rowconfigure(1, weight=0)
+        parent.grid_columnconfigure(0, weight=1)
+        self.source_display = ttk.LabelFrame(parent, text="Source Display")
+        self.source_display.grid(row=0, column=0, sticky="nsew")
+        self.display_label = ttk.Label(self.source_display, text="Source: None", font=('Arial', 12, 'bold'))
+        self.display_label.pack(anchor=tk.NW)
+        self.video_box = ttk.Frame(self.source_display)
+        self.video_box.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         self.video_label = tk.Label(
-            self.video_box_frame, text="Video output will appear here", bg="#000000", fg="white", font=("Arial", 16), anchor="center"
+            self.video_box, text="Video output will appear here", bg="#000000", fg="white", font=("Arial", 16), anchor="center"
         )
         self.video_label.pack(fill=tk.BOTH, expand=True)
         # Bottom status/info frame: shows status, source path, and FPS
         self.bottom_status_frame = ttk.Frame(parent)
-        self.bottom_status_frame.pack(fill=tk.X, pady=(10, 0))
+        self.bottom_status_frame.grid(row=1, column=0, sticky="ew")
         self.bottom_status_frame.columnconfigure(0, weight=1)
         self.bottom_status_frame.columnconfigure(1, weight=1)
         self.bottom_status_frame.columnconfigure(2, weight=1)
@@ -978,6 +996,8 @@ class YOLOGui:
         self.detections_label.config(text=f"Total Detections: {session_stats['totalDetections']}")
     # Clear source selection and reset display
     def clear_source(self):
+        if not messagebox.askokcancel("Clear Source", "Are you sure you want to clear the current source and reset the display?"):
+            return
         self.detection_manager.stop_detection()
         self.detector.reset_source()
         self.detection_display()
@@ -994,9 +1014,12 @@ class YOLOGui:
         self.rtsp_url.set("")
         if hasattr(self, 'mediamtx_proc') and self.mediamtx_proc:
             if sys.platform == 'win32':
-                subprocess.run(["taskkill", "/F", "/IM", "mediamtx.exe"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
-                )
+                try:
+                    subprocess.run(["taskkill", "/F", "/IM", "mediamtx.exe"],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
+                    )
+                except subprocess.CalledProcessError:
+                    pass
         self.mediamtx_proc = None
     # Model selection
     def model_select(self, event):
@@ -1029,13 +1052,18 @@ class YOLOGui:
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.root.mainloop()
     def on_closing(self):
-        if self.detection_manager.running:
-            self.detection_manager.stop_detection()
-        if hasattr(self, 'mediamtx_proc') and self.mediamtx_proc:
-            if sys.platform == 'win32':
-                subprocess.run(["taskkill", "/F", "/IM", "mediamtx.exe"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
-                )
-        self.root.destroy()
+        if messagebox.askokcancel("Quit", "Are you sure you want to exit?"):
+            if self.detection_manager.running:
+                self.detection_manager.stop_detection()
+            if hasattr(self, 'mediamtx_proc') and self.mediamtx_proc:
+                if sys.platform == 'win32':
+                    try:
+                        subprocess.run(["taskkill", "/F", "/IM", "mediamtx.exe"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
+                        )
+                    except subprocess.CalledProcessError:
+                        pass
+            self.root.destroy()
 # Run the GUI application
-if __name__ == "__main__":   YOLOGui().run()
+if __name__ == "__main__":
+    YOLOGui().run()
