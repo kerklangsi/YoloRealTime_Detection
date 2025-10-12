@@ -111,11 +111,9 @@ Below are example screenshots and sample outputs from the YOLO Real-Time Detecti
 **Example 8: More folder batch image detection**
 ![Folder Batch 3](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_6.png?raw=true)
 
-**Example 9: Annotated image result (from folder/image)**
-![Annotated Image](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/Image/CCTV%20video_0004.png?raw=true)
 
-**Example 10: Annotated image result (from photo folder)**
-![Annotated Photo](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/photo/Image/CCTV%20video_0004.png?raw=true)
+**Example 9: Annotated image result**
+ ![Annotated Image](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/Image/CCTV%20video_0004.png?raw=true) | ![Annotated Photo](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/photo/Image/CCTV%20video_0004.png?raw=true)
 
 **Example 11: Example video file (CCTV video)**
 [CCTV Video](https://raw.githubusercontent.com/kerklangsi/YoloRealTime_Detection/refs/heads/main/example/Video/CCTV%20video.mp4?raw=true)
