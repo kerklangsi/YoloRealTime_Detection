@@ -116,11 +116,15 @@ Below are example screenshots and sample outputs from the YOLO Real-Time Detecti
 |:----------------------------------------------------:|:------------------------------------------------------:|
 | ![Annotated Image](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/Image/CCTV%20video_0004.png?raw=true) | ![Annotated Photo](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/photo/Image/CCTV%20video_0004.png?raw=true) |
 
+<video controls width="600">
+  <source src="https://raw.githubusercontent.com/kerklangsi/YoloRealTime_Detection/refs/heads/main/example/Video/CCTV.mp4" type="video/mp4">
+</video>
+
 **Example 11: Example video file (CCTV video)**
-[CCTV Video](https://raw.githubusercontent.com/kerklangsi/YoloRealTime_Detection/refs/heads/main/example/Video/CCTV%20video.mp4?raw=true)
+[CCTV Video](https://raw.githubusercontent.com/kerklangsi/YoloRealTime_Detection/refs/heads/main/example/Video/CCTV.mp4?raw=true)
 
 **Example 12: Example video file (CCTV video)**
-[CCTV Video](https://raw.githubusercontent.com/kerklangsi/YoloRealTime_Detection/refs/heads/main/example/Video/CCTV%20video.mp4?raw=true)
+[CCTV Video](https://raw.githubusercontent.com/kerklangsi/YoloRealTime_Detection/refs/heads/main/example/Video/CCTV.mp4?raw=true)
 
 ## 🙌 Credits
 
