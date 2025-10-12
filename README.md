@@ -16,7 +16,6 @@ A portable **Windows GUI tool** for real-time object detection using YOLO models
 ```powershell
 git clone https://github.com/kerklangsi/YoloRealTime_Detection.git
 cd YoloRealTime_Detection
-python "YoloRealTime_Detection.py"
 pip install -r requirements.txt
 ```
 
@@ -51,7 +50,7 @@ pip install -r requirements.txt
 
 1. Run the GUI application:
    ```powershell
-   python main.py
+   python YoloRealTime_Detection.py
    ```
 2. Select the input source (Media Device, RTSP, Video File, Image File).
 3. Choose or load a YOLO model (`.pt` file).
@@ -81,9 +80,7 @@ Each feature is self-contained and guides you with prompts specific to its task.
 
 ---
 
-
 ### 🖼 Example Image
-
 
 Below are example screenshots and sample outputs from the YOLO Real-Time Detection GUI. Each image shows a different feature or input source:
 
