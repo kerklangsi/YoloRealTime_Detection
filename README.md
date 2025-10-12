@@ -119,7 +119,7 @@ Below are example screenshots and sample outputs from the YOLO Real-Time Detecti
 **Example 10: Example video file (CCTV video)**
 | Example image | Example Result |
 |:----------------------------------------------------:|:------------------------------------------------------:|
-| <video src="https://github.com/user-attachments/assets/813d8233-92af-40ad-a425-f73ecfa821c4" width="320" controls></video> | <video src="https://github.com/user-attachments/assets/fc7f5b80-f4d6-4776-bb58-75d2f57b3b60" width="320" controls></video> |
+| <video src="https://github.com/user-attachments/assets/813d8233-92af-40ad-a425-f73ecfa821c4" width="300" controls></video> | <video src="https://github.com/user-attachments/assets/fc7f5b80-f4d6-4776-bb58-75d2f57b3b60" width="300" controls></video> |
 
 ## 🙌 Credits
 
