@@ -82,7 +82,7 @@ Each feature is self-contained and guides you with prompts specific to its task.
 ---
 
 
-### 🖼 Example GUI Usage
+### 🖼 Example Image
 
 
 Below are example screenshots and sample outputs from the YOLO Real-Time Detection GUI. Each image shows a different feature or input source:
@@ -90,26 +90,18 @@ Below are example screenshots and sample outputs from the YOLO Real-Time Detecti
 **Example 1: Default GUI layout**
 ![Default GUI](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_1.png?raw=true)
 
-**Example 2: Media Device (webcam/camera) detection**
-![Media Device](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_2.png?raw=true)
-
-**Example 3: RTSP/RTMP stream detection**
-![RTSP Stream](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_3.png?raw=true)
-
-**Example 4: Video file detection**
-![Video File](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_4.png?raw=true)
-
-**Example 5: Image file detection**
-![Image File](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_5.png?raw=true)
-
-**Example 6: Folder batch image detection**
-![Folder Batch](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_6.png?raw=true)
-
-**Example 7: Additional folder batch image detection**
-![Folder Batch 2](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_6.png?raw=true)
-
-**Example 8: More folder batch image detection**
-![Folder Batch 3](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_6.png?raw=true)
+| Media Device (webcam/camera) detection | RTSP/RTMP stream detection |
+|:----------------------------------------------------:|:------------------------------------------------------:|
+| ![Media Device](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_2.png?raw=true) | ![RTSP Stream](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_3.png?raw=true) |
+|:----------------------------------------------------:|:------------------------------------------------------:|
+| Video file detection | Image file detection |
+|:----------------------------------------------------:|:------------------------------------------------------:|
+| ![Video File](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_4.png?raw=true) | ![Image File](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_5.png?raw=true)
+|:----------------------------------------------------:|:------------------------------------------------------:|
+| Folder batch image detection| Image file detection |
+|:----------------------------------------------------:|
+| ![Folder Batch](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_6.png?raw=true) |
+|:----------------------------------------------------:|
 
 **Example 9: Annotated image result**
 | Example image | Example Result |
@@ -118,8 +110,10 @@ Below are example screenshots and sample outputs from the YOLO Real-Time Detecti
 
 **Example 10: Example video file (CCTV video)**
 | Example Video | Example Result |
-|:----------------------------------------------------:|:------------------------------------------------------:|
-| <video src="https://github.com/user-attachments/assets/813d8233-92af-40ad-a425-f73ecfa821c4" width="80" controls></video> | <video src="https://github.com/user-attachments/assets/fc7f5b80-f4d6-4776-bb58-75d2f57b3b60" width="480" controls></video> |
+|:----------------------------------------------------:|
+| <video src="https://github.com/user-attachments/assets/813d8233-92af-40ad-a425-f73ecfa821c4"></video> |
+|:----------------------------------------------------:|
+|<video src="https://github.com/user-attachments/assets/fc7f5b80-f4d6-4776-bb58-75d2f57b3b60"></video> |
 
 ## 🙌 Credits
 
