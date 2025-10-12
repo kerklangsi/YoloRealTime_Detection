@@ -93,15 +93,10 @@ Below are example screenshots and sample outputs from the YOLO Real-Time Detecti
 | Media Device (webcam/camera) detection | RTSP/RTMP stream detection |
 |:----------------------------------------------------:|:------------------------------------------------------:|
 | ![Media Device](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_2.png?raw=true) | ![RTSP Stream](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_3.png?raw=true) |
-|:----------------------------------------------------:|:------------------------------------------------------:|
 | Video file detection | Image file detection |
-|:----------------------------------------------------:|:------------------------------------------------------:|
 | ![Video File](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_4.png?raw=true) | ![Image File](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_5.png?raw=true)
-|:----------------------------------------------------:|:------------------------------------------------------:|
-| Folder batch image detection| Image file detection |
-|:----------------------------------------------------:|
+| Folder batch image detection|
 | ![Folder Batch](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_6.png?raw=true) |
-|:----------------------------------------------------:|
 
 **Example 9: Annotated image result**
 | Example image | Example Result |
@@ -109,11 +104,8 @@ Below are example screenshots and sample outputs from the YOLO Real-Time Detecti
 | ![Annotated Image](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/Image/CCTV%20video_0004.png?raw=true) | ![Annotated Photo](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/photo/Image/CCTV%20video_0004.png?raw=true) |
 
 **Example 10: Example video file (CCTV video)**
-| Example Video | Example Result |
-|:----------------------------------------------------:|
-| <video src="https://github.com/user-attachments/assets/813d8233-92af-40ad-a425-f73ecfa821c4"></video> |
-|:----------------------------------------------------:|
-|<video src="https://github.com/user-attachments/assets/fc7f5b80-f4d6-4776-bb58-75d2f57b3b60"></video> |
+| Example Video | <video src="https://github.com/user-attachments/assets/813d8233-92af-40ad-a425-f73ecfa821c4"></video> |
+| Example Result | <video src="https://github.com/user-attachments/assets/fc7f5b80-f4d6-4776-bb58-75d2f57b3b60"></video> |
 
 ## 🙌 Credits
 
