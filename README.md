@@ -99,12 +99,12 @@ Below are example screenshots and sample outputs from the YOLO Real-Time Detecti
 | ![Folder Batch](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_6.png?raw=true) | ![Folder View](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_7.png?raw=true)
 
 **Example 9: Annotated image result**
-| Example image | Example Result |
+| Example Image | Example Result |
 |:----------------------------------------------------:|:------------------------------------------------------:|
 | ![Annotated Image](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/Image/CCTV%20video_0004.png?raw=true) | ![Annotated Photo](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/photo/Image/CCTV%20video_0004.png?raw=true) |
 
 **Example 10: Example video file (CCTV video)**
-| Example image | Example Result |
+| Example Video | Example Result |
 |:----------------------------------------------------:|:------------------------------------------------------:|
 | <video src="https://github.com/user-attachments/assets/813d8233-92af-40ad-a425-f73ecfa821c4" controls></video> | <video src="https://github.com/user-attachments/assets/b248a36e-5c21-4a4b-8ab9-b4fbff1b0be8" controls></video> |
 
