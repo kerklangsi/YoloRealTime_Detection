@@ -116,26 +116,10 @@ Below are example screenshots and sample outputs from the YOLO Real-Time Detecti
 |:----------------------------------------------------:|:------------------------------------------------------:|
 | ![Annotated Image](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/Image/CCTV%20video_0004.png?raw=true) | ![Annotated Photo](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/photo/Image/CCTV%20video_0004.png?raw=true) |
 
-**Example 10: Example video file (CCTV video)**  
-<table align="center">
-  <tr>
-    <th style="text-align:center; width:50%;">Example Video</th>
-    <th style="text-align:center; width:50%;">Example Result</th>
-  </tr>
-  <tr>
-    <td align="center">
-      <video src="https://github.com/user-attachments/assets/813d8233-92af-40ad-a425-f73ecfa821c4" 
-             width="370" 
-             controls></video>
-    </td>
-    <td align="center">
-      <video src="https://github.com/user-attachments/assets/fc7f5b80-f4d6-4776-bb58-75d2f57b3b60" 
-             width="370" 
-             controls></video>
-    </td>
-  </tr>
-</table>
-
+**Example 10: Example video file (CCTV video)**
+| Example Video | Example Result |
+|:----------------------------------------------------:|:------------------------------------------------------:|
+| <video src="https://github.com/user-attachments/assets/813d8233-92af-40ad-a425-f73ecfa821c4" width="280" controls></video> | <video src="https://github.com/user-attachments/assets/fc7f5b80-f4d6-4776-bb58-75d2f57b3b60" width="280" controls></video> |
 
 ## 🙌 Credits
 
