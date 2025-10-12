@@ -85,20 +85,21 @@ Below are example screenshots and sample outputs from the YOLO Real-Time Detecti
 **Example 1: Default GUI layout**
 ![Default GUI](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_1.png?raw=true)
 
+**Example 2: Different input sources**
 | Media Device (webcam/camera) detection | RTSP/RTMP stream detection |
 |:----------------------------------------------------:|:------------------------------------------------------:|
-| ![Media Device](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_2.png?raw=true) | ![RTSP Stream](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_3.png?raw=true) |
+| ![Media Device](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_2.png?raw=true) | ![RTSP/RTMP Stream](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_3.png?raw=true) |
 | Video file detection | Image file detection |
 | ![Video File](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_4.png?raw=true) | ![Image File](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_5.png?raw=true)
 | Folder batch image detection| Open Folder to view results |
 | ![Folder Batch](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_6.png?raw=true) | ![Folder View](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_7.png?raw=true)
 
-**Example 9: Annotated image result**
+**Example 3: Example Annotated image**
 | Example Image | Example Result |
 |:----------------------------------------------------:|:------------------------------------------------------:|
 | ![Annotated Image](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/Image/CCTV%20video_0004.png?raw=true) | ![Annotated Photo](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/photo/Image/CCTV%20video_0004.png?raw=true) |
 
-**Example 10: Example video file (CCTV video)**
+**Example 4: Example video file (CCTV video)**
 | Example Video | Example Result |
 |:----------------------------------------------------:|:------------------------------------------------------:|
 | <video src="https://github.com/user-attachments/assets/813d8233-92af-40ad-a425-f73ecfa821c4" controls></video> | <video src="https://github.com/user-attachments/assets/b248a36e-5c21-4a4b-8ab9-b4fbff1b0be8" controls></video> |
