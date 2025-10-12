@@ -112,6 +112,7 @@ Below are example screenshots and sample outputs from the YOLO Real-Time Detecti
 ![Folder Batch 3](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/GUI/example_6.png?raw=true)
 
 **Example 9: Annotated image result**
+| Example image | Example Result |
 |:----------------------------------------------------:|:------------------------------------------------------:|
 | ![Annotated Image](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/example/Image/CCTV%20video_0004.png?raw=true) | ![Annotated Photo](https://github.com/kerklangsi/YoloRealTime_Detection/blob/main/photo/Image/CCTV%20video_0004.png?raw=true) |
 
