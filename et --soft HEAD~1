@@ -1,0 +1,47 @@
+[33mb676a8a[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m bug
+[33mda5fde4[m 	modified:   README.md
+[33mf390e87[m 	modified:   README.md
+[33m5c7b955[m 	modified:   README.md
+[33m3691d32[m[33m ([m[1;33mtag: [m[1;33mv1.0.0[m[33m)[m 	modified:   README.md
+[33mfb5d0b7[m 	modified:   README.md 	modified:   example/Video/CCTV_2.mp4
+[33me2b7485[m update
+[33mf6e74c0[m update
+[33m0fc637f[m 	modified:   README.md 	new file:   example/GUI/example_7.png
+[33m5b0d6bb[m Update README.md
+[33m11e79a6[m Update README.md
+[33mc03929d[m Update README.md
+[33me9630d7[m Update README.md
+[33mb824380[m Update README.md
+[33m8f9f1ce[m Update README.md
+[33mabf9601[m Update README.md
+[33mf3e409d[m Update README.md
+[33m12e790c[m Update README.md
+[33m470a491[m Update README.md
+[33mf4b6988[m Update README.md
+[33m4895088[m Update README.md
+[33md67fd8e[m Update README.md
+[33m5f51e37[m update
+[33m941d14a[m Update README.md
+[33ma641814[m Create CCTV.mp4
+[33m46d7fc8[m Remove CCTV video from repository
+[33m79286d9[m Stop tracking .mp4 files with Git LFS
+[33m0e4ece6[m Update README.md
+[33m2398468[m Update README.md
+[33m8675c01[m Update README.md
+[33m17c2540[m Update README.md
+[33m7b845e4[m Update README.md
+[33m172cc58[m Update README.md
+[33m2c89f73[m Update README.md
+[33mcbb79f9[m delete
+[33m993b206[m update
+[33ma1a462c[m update
+[33mecd15cb[m update
+[33m3561dce[m delete
+[33me91bbf1[m Update README.md
+[33m7b46792[m update
+[33m56eb7d8[m Update README.md
+[33m340ec56[m Update README.md
+[33m01c07f3[m update
+[33mb7d0e63[m Update YoloRealTime_Detection.py
+[33me184e13[m 	deleted:    pyinstaller.ps1
+[33m52535aa[m 	modified:   YoloRealTime_Detection.py 	deleted:    YoloRealTime_Detection.spec 	new file:   config.json 	modified:   pyinstaller.ps1 	modified:   requirements.txt
