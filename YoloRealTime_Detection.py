@@ -211,7 +211,7 @@ class YOLOSource:
                 devices = graph.get_input_devices()
             if not devices:
                 for i in range(5):
-                    cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)
+                    cap = cv2.VideoCapture(i)
                     if cap.isOpened():
                         devices.append(f"Device {i}")
                         cap.release()
@@ -312,7 +312,7 @@ class YOLOSource:
             selected = self.gui.selected_device.get()
             if selected and selected != "None":
                 idx = int(selected.split()[-1])
-                cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
+                cap = cv2.VideoCapture(idx)
                 ret, frame = cap.read()
                 if ret and frame is not None:
                     self.gui.display_frame(frame)
@@ -393,9 +393,9 @@ class YOLODetection:
                 if device_index is None:
                     messagebox.showerror("Error", f"Could not resolve device index for: {selected}")
                     return
-                self.cap = cv2.VideoCapture(device_index, cv2.CAP_DSHOW)
+                self.cap = cv2.VideoCapture(device_index)
                 if not self.cap.isOpened():
-                    messagebox.showerror("Error", f"Could not open video source: {selected}")
+                    messagebox.showerror("Error", f"Could not open Media source: {selected}")
                     return
                 self.running = True
                 self.gui.yolo_process.cap = self.cap
