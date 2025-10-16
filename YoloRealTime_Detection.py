@@ -1,4 +1,5 @@
 import os,cv2,time,threading,sys,json,torch,socket,subprocess
+from pydoc import text
 import numpy as np
 import tkinter as tk
 from pathlib import Path
@@ -97,7 +98,7 @@ class YOLOStats:
                 detections.append({'class': class_name, 'confidence': stats['avg_confidence'], 'count': stats['current_count'], 'totalEncountered': stats['total_count']})
         return detections
     # Get session statistics
-    def get_session_stats(self, model_path: Optional[str] = None) -> Dict:
+    def get_stats(self, model_path: Optional[str] = None) -> Dict:
         if self.session_start is None:
             self.session_start = datetime.now()
         session_time = datetime.now() - self.session_start
@@ -109,7 +110,7 @@ class YOLOStats:
         }
     # Save statistics to JSON file
     def save_statistics(self, model_path: Optional[str] = None, filename: Optional[str] = None) -> str:
-        save_dir = Path(__file__).resolve().parent / "save"
+        save_dir = self.gui.SAVE_DIR
         save_dir.mkdir(exist_ok=True)
         if filename is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -125,7 +126,7 @@ class YOLOStats:
                         out[k][sk] = sv
             return out
         stats_data = {
-            'session_info': self.get_session_stats(model_path),
+            'session_info': self.get_stats(model_path),
             'detailed_stats': convert_stats(self.detection_stats),
             'export_time': datetime.now().isoformat()
         }
@@ -190,8 +191,8 @@ class YOLODetector:
     def get_current_detections(self) -> List[Dict]:
         return self.stats_manager.get_current_detections()
     # Get session statistics
-    def get_session_stats(self) -> Dict:
-        return self.stats_manager.get_session_stats(self.model_manager.model_path)
+    def get_stats(self) -> Dict:
+        return self.stats_manager.get_stats(self.model_manager.model_path)
     # Save statistics to JSON file
     def save_statistics(self, filename: Optional[str] = None) -> str:
         return self.stats_manager.save_statistics(self.model_manager.model_path, filename)
@@ -221,8 +222,7 @@ class YOLOSource:
                 self.gui.selected_device.set("None")
     # Initialize model list
     def refresh_models(self):
-        model_dir = Path(__file__).resolve().parent / "model"
-        models = list(model_dir.glob("*.pt"))
+        models = list(self.gui.MODEL_DIR.glob("*.pt"))
         self.gui.model_listbox.delete(0, tk.END)
         # Show all available models in the folder
         for model_path in models:
@@ -259,64 +259,27 @@ class YOLOSource:
         for frame in [self.gui.rtsp_frame, self.gui.file_frame, self.gui.media_device_frame]:
             frame.pack_forget()
         source = self.gui.selected_source.get()
-        # Display frame from the RTSP stream
         if source == "rtsp":
             self.gui.rtsp_frame.pack(fill=tk.X, pady=5)
-        # Display frame from the selected video file
         elif source == "video":
-            self.gui.file_frame.pack(fill=tk.X, pady=5)
-            for child in self.gui.file_frame.winfo_children():
-                if isinstance(child, ttk.Button):
-                    if child.cget('text') == 'Select Video File':
-                        child.pack(fill=tk.X, pady=2)
-                    else:
-                        child.pack_forget()
-            self.gui.file_label.pack_forget()
-            self.gui.file_label.pack(fill=tk.X, pady=(2, 0))
-        # Display frame from the selected image file
+            self.configure_file("Select Video File")
         elif source == "image":
-            self.gui.file_frame.pack(fill=tk.X, pady=5)
-            for child in self.gui.file_frame.winfo_children():
-                if isinstance(child, ttk.Button):
-                    if child.cget('text') == 'Select Image File':
-                        child.pack(fill=tk.X, pady=2)
-                    else:
-                        child.pack_forget()
-            self.gui.file_label.pack_forget()
-            self.gui.file_label.pack(fill=tk.X, pady=(2, 0))
-        # Display only the folder selection button for 'Folder' source
+            self.configure_file("Select Image File")
         elif source == "folder":
-            self.gui.file_frame.pack(fill=tk.X, pady=5)
-            for child in self.gui.file_frame.winfo_children():
-                if isinstance(child, ttk.Button):
-                    if child.cget('text') == 'Select Folder':
-                        child.pack(fill=tk.X, pady=2)
-                    else:
-                        child.pack_forget()
-            self.gui.file_label.pack_forget()
-            self.gui.file_label.pack(fill=tk.X, pady=(2, 0))
-        # Display frame from the selected folder
-        elif source == "folder":
-            self.gui.file_frame.pack(fill=tk.X, pady=5)
-            folder = self.gui.current_source
-            if folder and os.path.isdir(folder):
-                images = [f for f in os.listdir(folder) if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))]
-                if images:
-                    self.gui.file_label.config(text=f"{len(images)} images found")
-                else:
-                    self.gui.file_label.config(text="No images found")
-        # Display frame from the selected media device
+            self.configure_file("Select Folder")
         elif source == "media_device":
             self.gui.media_device_frame.pack(fill=tk.X, pady=5)
             self.refresh_media_devices()
-            selected = self.gui.selected_device.get()
-            if selected and selected != "None":
-                idx = int(selected.split()[-1])
-                cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
-                ret, frame = cap.read()
-                if ret and frame is not None:
-                    self.gui.display_frame(frame)
-                cap.release()
+    # Configure file frame buttons
+    def configure_file(self, visible_button_text: str):
+        self.gui.file_frame.pack(fill=tk.X, pady=5)
+        for child in self.gui.file_frame.winfo_children():
+            if isinstance(child, ttk.Button):
+                if child.cget('text') == visible_button_text:
+                    child.pack(fill=tk.X, pady=2)
+                else:
+                    child.pack_forget()
+        self.gui.file_label.pack(fill=tk.X, pady=(2, 0))
     # Handle model selection
     def model_select(self, event):
         selection = self.gui.model_listbox.curselection()
@@ -326,7 +289,7 @@ class YOLOSource:
             if os.path.isabs(model_name) and os.path.exists(model_name):
                 model_path = model_name
             else:
-                model_dir = Path(__file__).resolve().parent / "model"
+                model_dir = self.gui.MODEL_DIR
                 model_path = str(model_dir / model_name)
             self.gui.selected_model.set(model_name)
             # Attempt to load the selected model
@@ -338,7 +301,7 @@ class YOLOSource:
                 messagebox.showerror("Error", f"Failed to load model: {model_name}")
     # Load custom model from file dialog
     def load_custom_model(self):
-        model_dir = Path(__file__).resolve().parent / "model"
+        model_dir = self.gui.MODEL_DIR
         filename = filedialog.askopenfilename(title="Select YOLO Model File", initialdir=str(model_dir), filetypes=[("YOLO model files", "*.pt")])
         if filename:
             self.gui.custom_model_path.set(filename)
@@ -397,16 +360,7 @@ class YOLODetection:
                 if not self.cap.isOpened():
                     messagebox.showerror("Error", f"Could not open video source: {selected}")
                     return
-                self.running = True
-                self.gui.yolo_process.cap = self.cap
-                self.gui.yolo_process.running = True
-                self.gui.disable_source()
-                self.gui.start_button.config(state=tk.DISABLED)
-                self.gui.stop_button.config(state=tk.NORMAL)
-                self.gui.status_label.config(text="Status: Running")
-                source_text = self.gui.selected_device.get()
-                self.processing_thread = threading.Thread(target=self.gui.yolo_process.process_video, daemon=True)
-                self.processing_thread.start()
+                self.start_processing(self.cap, selected)
             # RTSP stream
             elif source_type == "rtsp":
                 rtsp_url = self.gui.rtsp_url.get().strip()
@@ -419,15 +373,7 @@ class YOLODetection:
                 if not self.cap.isOpened():
                     messagebox.showerror("Error", f"Could not open RTSP stream: {rtsp_url}")
                     return
-                self.running = True
-                self.gui.yolo_process.cap = self.cap
-                self.gui.yolo_process.running = True
-                self.gui.disable_source()
-                self.gui.start_button.config(state=tk.DISABLED)
-                self.gui.stop_button.config(state=tk.NORMAL)
-                self.gui.status_label.config(text="Status: Running")
-                self.processing_thread = threading.Thread(target=self.gui.yolo_process.process_video, daemon=True)
-                self.processing_thread.start()
+                self.start_processing(self.cap, rtsp_url)
             # Video file
             elif source_type == "video":
                 if not self.gui.current_source:
@@ -437,15 +383,7 @@ class YOLODetection:
                 if not self.cap.isOpened():
                     messagebox.showerror("Error", "Could not open video source")
                     return
-                self.running = True
-                self.gui.yolo_process.cap = self.cap
-                self.gui.yolo_process.running = True
-                self.gui.disable_source()
-                self.gui.start_button.config(state=tk.DISABLED)
-                self.gui.stop_button.config(state=tk.NORMAL)
-                self.gui.status_label.config(text="Status: Running")
-                self.processing_thread = threading.Thread(target=self.gui.yolo_process.process_video, daemon=True)
-                self.processing_thread.start()
+                self.start_processing(self.cap, self.gui.current_source)
             # Image file
             elif source_type == "image":
                 if not self.gui.current_source:
@@ -459,10 +397,10 @@ class YOLODetection:
                 annotated_frame, detections = self.gui.detector.objects(frame, self.gui.conf_threshold.get(), self.gui.nms_threshold.get())
                 self.gui.yolo_process.display_frame(annotated_frame)
                 self.gui.detection_display()
-                # Save annotated result in photo/<image_name>
+                # Save annotated result in photo
                 image_path = Path(self.gui.current_source)
                 image_name = image_path.name
-                photo_dir = Path(__file__).resolve().parent / "photo"
+                photo_dir = self.gui.PHOTO_DIR
                 photo_dir.mkdir(parents=True, exist_ok=True)
                 result_path = photo_dir / image_name
                 cv2.imwrite(str(result_path), annotated_frame)
@@ -477,17 +415,14 @@ class YOLODetection:
                 if not images:
                     messagebox.showerror("Error", "No images found in folder")
                     return
-                photo_dir = Path(__file__).resolve().parent / "photo"
+                photo_dir = self.gui.PHOTO_DIR
                 folder_name = os.path.basename(folder)
                 result_dir = photo_dir / folder_name
                 result_dir.mkdir(parents=True, exist_ok=True)
                 total = len(images)
                 processed_count = 0
+                self.state()
                 self.gui.yolo_process.running = True
-                self.gui.disable_source()
-                self.gui.start_button.config(state=tk.DISABLED)
-                self.gui.stop_button.config(state=tk.NORMAL)
-                self.gui.status_label.config(text="Status: Running")
                 self.processing_thread = threading.Thread(target=lambda: self.gui.yolo_process.process_folder(images, folder, result_dir, total), daemon=True)
                 self.processing_thread.start()
             else:
@@ -500,7 +435,6 @@ class YOLODetection:
         if not self.running:
             return
         self.running = False
-        # Release video capture safely
         if self.cap:
             try:
                 self.cap.release()
@@ -513,6 +447,25 @@ class YOLODetection:
         self.gui.status_label.config(text="Status: Stopped")
         self.gui.fps_label.config(text="FPS: 0")
         self.gui.enable_source()
+    # Update GUI state to running
+    def state(self):
+        self.gui.disable_source()
+        self.gui.start_button.config(state=tk.DISABLED)
+        self.gui.stop_button.config(state=tk.NORMAL)
+        self.gui.status_label.config(text="Status: Running")
+    # Start processing thread
+    def start_processing(self, cap: cv2.VideoCapture, source_name: str):
+        if not cap or not cap.isOpened():
+            messagebox.showerror("Error", f"Could not open source: {source_name}")
+            if cap:
+                cap.release()
+            return
+        self.cap = cap
+        self.running = True
+        self.state()
+        self.gui.yolo_process.cap = self.cap
+        self.processing_thread = threading.Thread(target=self.gui.yolo_process.process_video, daemon=True)
+        self.processing_thread.start()
 # processing source class
 class YOLOProcess:
     def __init__(self, gui):
@@ -578,6 +531,7 @@ class YOLOProcess:
         pad_right = target_w - new_w - pad_left
         pad_top = (target_h - new_h) // 2
         pad_bottom = target_h - new_h - pad_top
+        # 
         frame_resized = cv2.copyMakeBorder(
             frame_scaled, pad_top, pad_bottom, pad_left, pad_right,
             cv2.BORDER_CONSTANT, value=(0, 0, 0)
@@ -607,10 +561,6 @@ class YOLOProcess:
         else:
             self.gui.display_label.config(text="Source: None")
             self.gui.path_label.config(text="Source Path: None")
-        pil_image = Image.fromarray(frame_resized)
-        photo = ImageTk.PhotoImage(pil_image)
-        self.gui.video_label.configure(image=photo)
-        self.gui.current_photo = photo
     # Process image folder
     def process_folder(self, images, folder, result_dir, total):
         processed_count = 0
@@ -630,26 +580,19 @@ class YOLOProcess:
             processed_count += 1
             # Overlay percentage and annotation count for GUI preview only
             preview_frame = annotated_frame.copy()
-            percent = int((idx+1)/total*100)
-            percent_text = f"{percent}%"
-            count_text = f"{idx+1}/{total}"
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale, thickness = 1.0, 2
-            # Percentage (top left)
-            pt_x, pt_y = 10, 50
-            text_size, _ = cv2.getTextSize(percent_text, font, font_scale, thickness)
-            bg_rect = (pt_x-5, pt_y-text_size[1]-5, pt_x+text_size[0]+5, pt_y+10)
-            cv2.rectangle(preview_frame, (bg_rect[0], bg_rect[1]), (bg_rect[2], bg_rect[3]), (0,0,0), -1)
-            cv2.putText(preview_frame, percent_text, (pt_x, pt_y), font, font_scale, (255,255,255), thickness, cv2.LINE_AA)
-            # Count (top right)
+            percent = int((idx + 1) / total * 100)
+            # Draw percentage (top left) using the new helper
+            self.draw_text(preview_frame, f"{percent}%", (10, 50))
+            # Draw count (top right) using the new helper
+            count_text = f"{idx + 1}/{total}"
+            font_details = (cv2.FONT_HERSHEY_SIMPLEX, 1.0, 2)
+            text_size, _ = cv2.getTextSize(count_text, *font_details)
             img_w = preview_frame.shape[1]
-            text_size2, _ = cv2.getTextSize(count_text, font, font_scale, thickness)
-            ct_x, ct_y = img_w - text_size2[0] - 10, 50
-            bg_rect2 = (ct_x-5, ct_y-text_size2[1]-5, ct_x+text_size2[0]+5, ct_y+10)
-            cv2.rectangle(preview_frame, (bg_rect2[0], bg_rect2[1]), (bg_rect2[2], bg_rect2[3]), (0, 0, 0), -1)
-            cv2.putText(preview_frame, count_text, (ct_x, ct_y), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
+            count_pos_x = img_w - text_size[0] - 10
+            self.draw_text(preview_frame, count_text, (count_pos_x, 50))
             self.display_frame(preview_frame)
             self.gui.root.update_idletasks()
+        # Show final message box
         def show_result():
             if processed_count == total:
                 messagebox.showinfo("Success", f"Processed {processed_count} images. Results saved in result.")
@@ -657,6 +600,15 @@ class YOLOProcess:
                 messagebox.showinfo("Stopped", f"Stopped early. {processed_count} images processed and saved in result.")
         self.gui.detection_manager.stop_detection()
         self.gui.root.after(0, show_result)
+    # Draw text with background rectangle
+    def draw_text(self, frame, text, pos, font_scale=1.0, thickness=2):
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        text_size, _ = cv2.getTextSize(text, font, font_scale, thickness)
+        x, y = pos
+        bg_rect_pt1 = (x - 5, y - text_size[1] - 5)
+        bg_rect_pt2 = (x + text_size[0] + 5, y + 10)
+        cv2.rectangle(frame, bg_rect_pt1, bg_rect_pt2, (0, 0, 0), -1)
+        cv2.putText(frame, text, (x, y), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
     # Update RTMP URL
     def update_rtmp_url(self):
         mediamtx_path = os.path.join(os.path.dirname(__file__), 'mediamtx', 'mediamtx.exe')
@@ -684,17 +636,8 @@ class YOLOProcess:
                 except Exception as e:
                     messagebox.showerror("mediamtx Error", f"Could not start mediamtx: {e}")
         else:
-            # RTMP disabled: stop mediamtx and clear RTSP URL
             self.gui.rtsp_url.set("")
-            if hasattr(self.gui, 'mediamtx_proc') and self.gui.mediamtx_proc:
-                if sys.platform == 'win32':
-                    try:
-                        subprocess.run(["taskkill", "/F", "/IM", "mediamtx.exe"],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
-                        )
-                    except subprocess.CalledProcessError:
-                        pass
-            self.gui.mediamtx_proc = None
+            self.gui.stop_mediamtx()
             messagebox.showinfo("Success", "RTMP stopped")
 # GUI statistics panel class
 class YOLOStatsPanel:
@@ -730,8 +673,7 @@ class YOLOStatsPanel:
             source_name = source_path.stem
         else:
             source_name = "auto"
-        save_dir = Path(__file__).resolve().parent / "photo" / source_name
-        save_dir.mkdir(parents=True, exist_ok=True)
+        save_dir = self.gui.PHOTO_DIR / source_name
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         filename = str(save_dir / f"{timestamp}.png")
         pil_image = None
@@ -744,29 +686,34 @@ class YOLOStatsPanel:
             pil_image.save(filename)
     # Open save folder in file explorer
     def open_save_folder(self):
-        save_folder = Path(__file__).resolve().parent / "save"
-        save_folder.mkdir(exist_ok=True)
+        save_folder = self.gui.SAVE_DIR
         subprocess.Popen(f'explorer "{save_folder}"')
     # Open results folder in file explorer
     def open_photo_folder(self):
-        photo_folder = Path(__file__).resolve().parent / "photo"
-        photo_folder.mkdir(exist_ok=True)
+        photo_folder = self.gui.PHOTO_DIR
         subprocess.Popen(f'explorer "{photo_folder}"')
     # Open model folder in file explorer
     def open_model_folder(self):
-        model_folder = Path(__file__).resolve().parent / "model"
-        model_folder.mkdir(exist_ok=True)
+        model_folder = self.gui.MODEL_DIR
         subprocess.Popen(f'explorer "{model_folder}"')
 # Main GUI class
 class YOLOGui:
     def __init__(self):
         # Initialize main window and variables
+        self.BASE_DIR = Path(__file__).resolve().parent
+        self.MODEL_DIR = self.BASE_DIR / "model"
+        self.SAVE_DIR = self.BASE_DIR / "save"
+        self.PHOTO_DIR = self.BASE_DIR / "photo"
+        self.ICON_PATH = self.BASE_DIR / "icon.ico"
+        # Ensure directories exist
+        for path in [self.MODEL_DIR, self.SAVE_DIR, self.PHOTO_DIR]:
+            path.mkdir(exist_ok=True)
+        # Initialize main window
         self.root = tk.Tk()
         self.root.title("YOLO Object Detection GUI")
-        icon_path = Path(__file__).resolve().parent / "icon.ico"
-        self.root.iconbitmap(str(icon_path))
-        self.root.geometry("1500x700")
-        self.root.minsize(1500, 700)
+        self.root.iconbitmap(str(self.ICON_PATH))
+        self.root.geometry("1500x680")
+        self.root.minsize(1500, 680)
         self.root.configure(bg="#ffffff")
         self.cap, self.running = None, False
         self.current_source, self.processing_thread = None, None
@@ -813,18 +760,21 @@ class YOLOGui:
         self.setup_right_panel(self.right_frame)
     # Setup left panel components
     def setup_left_panel(self, parent):
-        left_frame = ttk.LabelFrame(parent, text="Source Selection", padding=10)
-        left_frame.pack(fill=tk.BOTH, expand=True, padx=(0, 2), pady=(0, 0))
+        main_frame = ttk.Frame(parent)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=(5, 0))
+        # First row: Input source selection, Model selection, Detection settings
+        top_row = ttk.Frame(main_frame)
+        top_row.pack(fill=tk.X, side=tk.TOP, padx=5)
         # Input source selection
-        ttk.Label(left_frame, text="Input Source:", font=('Arial', 10, 'bold')).pack(anchor=tk.W, pady=(0, 5))
+        ttk.Label(top_row, text="Input Source", font=('Arial', 10, 'bold')).pack(anchor=tk.W, pady=(0, 5))
         sources = ["Media Device", "RTSP Stream", "Video File", "Image File", "Folder"]
         values = ["media_device", "rtsp", "video", "image", "folder"]
         self.source_live_buttons = []
         for text, value in zip(sources, values):
-            rb = ttk.Radiobutton(left_frame, text=text, variable=self.selected_source,value=value, command=self.source_manager.on_source_change)
+            rb = ttk.Radiobutton(top_row, text=text, variable=self.selected_source,value=value, command=self.source_manager.on_source_change)
             rb.pack(anchor=tk.W, pady=2)
             self.source_live_buttons.append(rb)
-        self.source_frame = ttk.Frame(left_frame)
+        self.source_frame = ttk.Frame(top_row)
         self.source_frame.pack(fill=tk.X, pady=10)
         # RTSP input
         self.rtsp_frame = ttk.Frame(self.source_frame)
@@ -850,51 +800,56 @@ class YOLOGui:
             ttk.Button(self.file_frame, text=txt, command=cmd).pack(fill=tk.X)
         self.file_label = ttk.Label(self.file_frame, text="No file selected", foreground="blue")
         self.file_label.pack(fill=tk.X, pady=2)
-        ttk.Separator(left_frame, orient='horizontal').pack(fill=tk.X)
+        ttk.Separator(top_row, orient='horizontal').pack(fill=tk.X)
         # Model selection
-        ttk.Label(left_frame, text="Select Model:", font=('Arial', 10, 'bold')).pack(anchor=tk.W, pady=(0, 5))
-        model_dir = Path(__file__).resolve().parent / "model"
-        ttk.Label(left_frame, text=f"{model_dir}", font=('Arial', 10)).pack(anchor=tk.W, pady=(0, 2))
-        self.model_listbox = tk.Listbox(left_frame, height=5, exportselection=False)
+        ttk.Label(top_row, text="Select Model:", font=('Arial', 10, 'bold')).pack(anchor=tk.W, pady=(0, 5))
+        model_dir = self.MODEL_DIR
+        ttk.Label(top_row, text=f"{model_dir}", font=('Arial', 10)).pack(anchor=tk.W, pady=(0, 2))
+        self.model_listbox = tk.Listbox(top_row, height=5, exportselection=False)
         self.model_listbox.pack(fill=tk.X, pady=2)
         self.model_listbox.bind('<<ListboxSelect>>', self.model_select)
-        ttk.Button(left_frame, text="Load Custom Model", command=self.load_custom_model).pack(fill=tk.X, pady=2)
-        ttk.Label(left_frame, textvariable=self.custom_model_path, foreground="blue").pack(fill=tk.X, pady=2)
-        ttk.Separator(left_frame, orient='horizontal').pack(fill=tk.X)
+        ttk.Button(top_row, text="Load Custom Model", command=self.load_custom_model).pack(fill=tk.X, pady=2)
+        ttk.Label(top_row, textvariable=self.custom_model_path, foreground="blue").pack(fill=tk.X, pady=2)
+        ttk.Separator(top_row, orient='horizontal').pack(fill=tk.X)
         # Detection settings
-        ttk.Label(left_frame, text="Detection Settings:", font=('Arial', 10, 'bold')).pack(anchor=tk.W, pady=(0, 5))
+        ttk.Label(top_row, text="Detection Settings:", font=('Arial', 10, 'bold')).pack(anchor=tk.W, pady=(0, 5))
         scale_width, label_width = 150, 18
         for label, var, cmd, val in [
             ("Confidence Threshold:", self.conf_threshold, self.update_conf, "50%"),
             ("NMS Threshold:", self.nms_threshold, self.update_nms, "40%")
         ]:
-            frame = ttk.Frame(left_frame)
+            frame = ttk.Frame(top_row)
             frame.pack(fill=tk.X, pady=2)
             frame.columnconfigure(0, minsize=label_width*8)
             frame.columnconfigure(1, weight=1)
             ttk.Label(frame, text=label).grid(row=0, column=0, sticky=tk.W)
             scale = ttk.Scale(frame, from_=0.0, to=1.0, variable=var, orient=tk.HORIZONTAL, command=cmd, length=scale_width)
             scale.grid(row=0, column=1, sticky=tk.EW, padx=5)
+            handler = lambda event, s=scale, v=var, c=cmd: self.scale_click(event, s, v, c)
+            scale.bind('<Button-1>', handler)
+            scale.bind('<B1-Motion>', handler)
             lbl = ttk.Label(frame, text=val)
             lbl.grid(row=0, column=2, sticky=tk.E)
             if label.startswith("Confidence"):
                 self.conf_scale, self.conf_label = scale, lbl
             else:
                 self.nms_scale, self.nms_label = scale, lbl
-        ttk.Separator(left_frame, orient='horizontal').pack(fill=tk.X, pady=10)
-        # Detection control buttons
-        self.start_button = ttk.Button(left_frame, text="Start Detection", command=self.detection_manager.start_detection)
-        self.start_button.pack(fill=tk.X, pady=5)
-        self.stop_button = ttk.Button(left_frame, text="Stop Detection", command=self.detection_manager.stop_detection, state=tk.DISABLED)
-        self.stop_button.pack(fill=tk.X, pady=5)
-        ttk.Button(left_frame, text="Clear source", command=self.clear_source).pack(fill=tk.X, pady=5)
+        ttk.Separator(top_row, orient='horizontal').pack(fill=tk.X)
+        # Second row: Detection control buttons at the bottom
+        bottom_row = ttk.Frame(main_frame)
+        bottom_row.pack(fill=tk.X, side=tk.BOTTOM, pady=(0, 20))
+        self.start_button = ttk.Button(bottom_row, text="Start Detection", command=self.detection_manager.start_detection)
+        self.start_button.pack(fill=tk.X, ipady=10)
+        self.stop_button = ttk.Button(bottom_row, text="Stop Detection", command=self.detection_manager.stop_detection, state=tk.DISABLED)
+        self.stop_button.pack(fill=tk.X, ipady=10)
+        ttk.Button(bottom_row, text="Clear source", command=self.clear_source).pack(fill=tk.X, ipady=10)
         self.source_manager.on_source_change()
     # Setup center panel with video display and status
     def setup_center_panel(self, parent):
         parent.grid_rowconfigure(0, weight=1)
         parent.grid_rowconfigure(1, weight=0)
         parent.grid_columnconfigure(0, weight=1)
-        self.source_display = ttk.LabelFrame(parent, text="Source Display")
+        self.source_display = ttk.Frame(parent)
         self.source_display.grid(row=0, column=0, sticky="nsew")
         self.display_label = ttk.Label(self.source_display, text="Source: None", font=('Arial', 12, 'bold'))
         self.display_label.pack(anchor=tk.NW)
@@ -919,10 +874,12 @@ class YOLOGui:
         self.fps_label.grid(row=0, column=2, sticky=tk.E)
     # Setup right panel with detection results and statistics
     def setup_right_panel(self, parent):
-        right_frame = ttk.LabelFrame(parent, text="Detection Results")
+        right_frame = ttk.Frame(parent)
         right_frame.pack(side=tk.RIGHT, fill=tk.Y)
+        ttk.Label(right_frame, text="Detection Results", font=('Arial', 10, 'bold')).pack(anchor=tk.W, pady=(0, 5))
+        # Session Statistics inside right_frame
         stats_frame = ttk.LabelFrame(right_frame, text="Session Statistics", padding=5)
-        stats_frame.pack(fill=tk.X, pady=(0, 10))
+        stats_frame.pack(fill=tk.X, padx=(0, 5))
         self.model_label = ttk.Label(stats_frame, text="Model: None")
         self.model_label.pack(anchor=tk.W)
         self.gpu_label = ttk.Label(stats_frame, text="Device: Unknown")
@@ -991,7 +948,7 @@ class YOLOGui:
                     self.stats_panel.save_frame()
                     self.last_save = now
         self.last_count = main_count
-        session_stats = self.detector.get_session_stats()
+        session_stats = self.detector.get_stats()
         self.session_label.config(text=f"Session Time: {session_stats['sessionTime']}")
         self.detections_label.config(text=f"Total Detections: {session_stats['totalDetections']}")
     # Clear source selection and reset display
@@ -1003,7 +960,6 @@ class YOLOGui:
         self.detection_display()
         self.selected_source.set("media_device")
         self.selected_device.set("")
-        self.rtsp_url.set(""); self.rtmp_url.set("")
         self.current_source = None
         self.file_label.config(text="No file selected")
         self.source_manager.on_source_change()
@@ -1012,15 +968,33 @@ class YOLOGui:
         self.clear_video_image(); self.enable_source()
         self.rtmp_enabled.set(False)
         self.rtsp_url.set("")
+        self.stop_mediamtx()
+    # Custom scale click handler
+    def scale_click(self, event, scale, var, cmd):
+            try:
+                from_ = float(scale['from'])
+                to = float(scale['to'])
+                width = scale.winfo_width()
+                if width == 0:
+                    return 'break'
+                rel_x = max(0, min(event.x, width))
+                value = from_ + (to - from_) * (rel_x / width)
+                var.set(value)
+                cmd(value)
+                return 'break'
+            except Exception:
+                return 'break'
+    # Stop mediamtx process if running
+    def stop_mediamtx(self):
         if hasattr(self, 'mediamtx_proc') and self.mediamtx_proc:
             if sys.platform == 'win32':
                 try:
                     subprocess.run(["taskkill", "/F", "/IM", "mediamtx.exe"],
                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
                     )
-                except subprocess.CalledProcessError:
+                except (subprocess.CalledProcessError, FileNotFoundError):
                     pass
-        self.mediamtx_proc = None
+            self.mediamtx_proc = None
     # Model selection
     def model_select(self, event):
         self.source_manager.model_select(event)
@@ -1055,14 +1029,7 @@ class YOLOGui:
         if messagebox.askokcancel("Quit", "Are you sure you want to exit?"):
             if self.detection_manager.running:
                 self.detection_manager.stop_detection()
-            if hasattr(self, 'mediamtx_proc') and self.mediamtx_proc:
-                if sys.platform == 'win32':
-                    try:
-                        subprocess.run(["taskkill", "/F", "/IM", "mediamtx.exe"],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
-                        )
-                    except subprocess.CalledProcessError:
-                        pass
+            self.stop_mediamtx()
             self.root.destroy()
 # Run the GUI application
 if __name__ == "__main__":
