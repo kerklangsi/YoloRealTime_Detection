@@ -395,7 +395,7 @@ class YOLODetection:
                     return
                 self.cap = cv2.VideoCapture(device_index, cv2.CAP_DSHOW)
                 if not self.cap.isOpened():
-                    messagebox.showerror("Error", f"Could not open device source: {selected}")
+                    messagebox.showerror("Error", f"Could not open video source: {selected}")
                     return
                 self.running = True
                 self.gui.yolo_process.cap = self.cap
